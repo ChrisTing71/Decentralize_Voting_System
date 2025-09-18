@@ -1058,7 +1058,9 @@ class VotingNodeWithAutoGUI {
 		// Share ALL decryption keys in a batch to break correlation
 		this.shareAllKeys();
 		
-		setTimeout(() => this.checkIfReadyToPropose(), 10000);
+		// We now have dedicated consensus time, so use simpler timing
+		setTimeout(() => this.checkIfReadyToPropose(), 3000);  // Fixed 3 seconds to start
+		console.log(`� Consensus phase started (15s dedicated time)`);
 		
 		// ENHANCED: Notify GUI clients of phase change
 		this.notifyGUIClients('PHASE_CHANGE', {
@@ -1285,20 +1287,29 @@ class VotingNodeWithAutoGUI {
         }
 
         // Validate voting time: min 30 seconds, max 600 seconds (10 minutes), default 100 seconds
+        // Note: This is pure voting time - consensus phase gets additional fixed time
         if (typeof votingTimeSeconds !== 'number' || votingTimeSeconds < 30 || votingTimeSeconds > 600) {
             console.log(`⚠️ Invalid voting time: ${votingTimeSeconds}s. Using default 100 seconds.`);
-            console.log('   Valid range: 30-600 seconds (0.5-10 minutes)');
+            console.log('   Valid range: 30-600 seconds (0.5-10 minutes) for voting phase only');
             votingTimeSeconds = 100;
         }
 
         const roundId = `round_${Date.now()}_${this.nodeId}`;
+        
+        // Separate voting and consensus phases
+        const votingPhaseMs = votingTimeSeconds * 1000;  // User-specified voting time
+        const consensusPhaseMs = 15000;  // Fixed 15 seconds for consensus
+        const totalRoundMs = votingPhaseMs + consensusPhaseMs;  // Total round duration
+        
         const round = {
             id: roundId,
             topic: topic,
             allowedChoices: allowedChoices,
             startTime: Date.now(),
-            duration: votingTimeSeconds * 1000, // Convert to milliseconds
-            votingTimeSeconds: votingTimeSeconds, // Store original seconds for reference
+            duration: totalRoundMs,  // Total duration includes both phases
+            votingTimeSeconds: votingTimeSeconds,  // Store original voting time
+            votingPhaseMs: votingPhaseMs,  // Voting phase duration
+            consensusPhaseMs: consensusPhaseMs,  // Consensus phase duration
             phase: 'VOTING',
             votes: new Map(),
             results: null,
@@ -1333,15 +1344,15 @@ class VotingNodeWithAutoGUI {
             console.log(`Allowed choices: ${allowedChoices.join(', ')}`);
         }
         console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-        console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
+        console.log(`⏰ Voting phase: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
+        console.log(`🔓 Consensus phase: ${consensusPhaseMs/1000} seconds (fixed)`);
+        console.log(`📊 Total round time: ${Math.round(totalRoundMs/1000)} seconds`);
         console.log(`Active nodes: ${this.getActiveNodeCount()}`);
         console.log(`Type 'vote <choice>' to cast your encrypted vote`);
         
-        // Schedule phase transitions with custom timing
-        // Consensus phase starts at 80% of voting time
-        const consensusDelay = Math.round(votingTimeSeconds * 0.8 * 1000);
-        this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
-        this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), round.duration);
+        // Simple phase transitions: voting time → consensus phase → finish
+        this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), votingPhaseMs);
+        this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), totalRoundMs);
         
         return roundId;
     }
@@ -1413,7 +1424,7 @@ class VotingNodeWithAutoGUI {
         
         if (!encryptedVotes || !voteKeys) {
             console.log('⏳ Waiting for vote keys...');
-            setTimeout(() => this.checkIfReadyToPropose(), 3000);
+            setTimeout(() => this.checkIfReadyToPropose(), 2000);  // Fixed 2 seconds
             return;
         }
         
@@ -1446,8 +1457,8 @@ class VotingNodeWithAutoGUI {
             // Additional safety: wait a bit more to ensure all nodes are in the same state
             if (!this.keysSharingComplete) {
                 this.keysSharingComplete = true;
-                console.log('✅ All keys received - waiting 3 more seconds for synchronization...');
-                setTimeout(() => this.checkIfReadyToPropose(), 3000);
+                console.log(`✅ All keys received - waiting 2s for synchronization...`);
+                setTimeout(() => this.checkIfReadyToPropose(), 2000);  // Fixed 2 seconds
                 return;
             }
             
@@ -1455,8 +1466,8 @@ class VotingNodeWithAutoGUI {
             this.proposeResults();
         } else {
             console.log(`⏳ Still waiting: need keys for ${totalEncryptedVotes - totalKeys} votes OR key batches from ${activeNodes - uniqueKeyProviders.size} more nodes`);
-            // Check again in 3 seconds
-            setTimeout(() => this.checkIfReadyToPropose(), 3000);
+            // Check again in 2 seconds (fixed retry time for consensus phase)
+            setTimeout(() => this.checkIfReadyToPropose(), 2000);
         }
     }
 
@@ -1798,7 +1809,7 @@ class VotingNodeWithAutoGUI {
                     console.log('  start "Should we deploy?" yes,no 60                 # 60 seconds');
                     console.log('  start "Pick a color" red,blue,green,yellow 180      # 3 minutes');
                     console.log('  start "Free text question" 120                      # 2 minutes, any answer');
-                    console.log('  start "Quick poll" yes,no 30                        # 30 seconds (minimum)');
+                    console.log('  start "Quick poll" yes,no 30                        # 30 seconds voting + 15s consensus');
                     console.log('  start "Long discussion" agree,disagree,neutral 600  # 10 minutes (maximum)');
                     break;
                 }

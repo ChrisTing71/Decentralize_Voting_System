@@ -463,6 +463,11 @@
                             <textarea id="voteTopicInput" rows="3" placeholder="Enter your voting topic..."></textarea>
                         </div>
                         <div class="form-group">
+                            <label for="votingTimeInput">Voting Duration (30-600 seconds)</label>
+                            <input type="number" id="votingTimeInput" min="30" max="600" value="100" placeholder="100">
+                            <small style="color: #666; font-size: 0.9em;">Default: 100 seconds, Min: 30 seconds, Max: 600 seconds (+ 15s consensus)</small>
+                        </div>
+                        <div class="form-group">
                             <label for="choicesInput">Allowed Choices (optional)</label>
                             <input type="text" id="choicesInput" placeholder="e.g., yes,no,abstain or red,blue,green">
                             <small style="color: #666; font-size: 0.9em;">Leave empty for free-text voting</small>
@@ -738,9 +743,17 @@
             function startVote() {
                 const topic = document.getElementById('voteTopicInput').value.trim();
                 const choices = document.getElementById('choicesInput').value.trim();
+                const votingTime = document.getElementById('votingTimeInput').value;
                 
                 if (!topic) {
                     alert('Please enter a voting topic');
+                    return;
+                }
+                
+                // Validate voting time
+                const time = parseInt(votingTime);
+                if (votingTime && (isNaN(time) || time < 30 || time > 600)) {
+                    alert('Voting time must be between 30 and 600 seconds');
                     return;
                 }
                 
@@ -748,12 +761,17 @@
                 if (choices) {
                     args.push(choices);
                 }
+                if (votingTime && votingTime !== '100') {
+                    // Add voting time as the last argument if it's not the default
+                    args.push(votingTime);
+                }
                 
                 sendCommand('start', args);
                 
                 // Clear form
                 document.getElementById('voteTopicInput').value = '';
                 document.getElementById('choicesInput').value = '';
+                document.getElementById('votingTimeInput').value = '100';
             }
 
             function castVote() {
