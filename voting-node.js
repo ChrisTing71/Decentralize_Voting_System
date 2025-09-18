@@ -632,6 +632,7 @@ class VotingNodeWithAutoGUI {
                 roundId: this.currentRound.id,
                 topic: this.currentRound.topic,
                 allowedChoices: this.currentRound.allowedChoices,
+                votingTimeSeconds: this.currentRound.votingTimeSeconds || 100,
                 phase: this.currentRound.phase
             }));
         }
@@ -650,19 +651,30 @@ class VotingNodeWithAutoGUI {
                 
             case 'start':
                 if (args.length === 0) {
-                    response = 'Usage: start <topic> [choice1,choice2,choice3]';
+                    response = 'Usage: start <topic> [choice1,choice2,choice3] [time_in_seconds]';
                 } else {
-                    let topic, allowedChoices = null;
+                    let topic, allowedChoices = null, votingTime = 100;
+                    let parsedArgs = [...args]; // Create a copy of args that we can modify
                     
-                    if (args.length > 1 && args[args.length - 1].includes(',')) {
-                        allowedChoices = args[args.length - 1].split(',').map(choice => choice.trim());
-                        topic = args.slice(0, -1).join(' ');
-                    } else {
-                        topic = args.join(' ');
+                    // Parse arguments similar to CLI
+                    const lastArg = parsedArgs[parsedArgs.length - 1];
+                    
+                    // Check if last argument is a number (voting time)
+                    if (/^\d+$/.test(lastArg)) {
+                        votingTime = parseInt(lastArg);
+                        parsedArgs = parsedArgs.slice(0, -1); // Remove time from args
                     }
                     
-                    this.startVotingRound(topic, allowedChoices);
-                    response = `Started voting round: ${topic}`;
+                    // Check if remaining last argument contains commas (choices)
+                    if (parsedArgs.length > 1 && parsedArgs[parsedArgs.length - 1].includes(',')) {
+                        allowedChoices = parsedArgs[parsedArgs.length - 1].split(',').map(choice => choice.trim());
+                        topic = parsedArgs.slice(0, -1).join(' ');
+                    } else {
+                        topic = parsedArgs.join(' ');
+                    }
+                    
+                    this.startVotingRound(topic, allowedChoices, votingTime);
+                    response = `Started voting round: ${topic} (${votingTime}s)`;
                 }
                 break;
                 
@@ -851,6 +863,7 @@ class VotingNodeWithAutoGUI {
 					roundId: message.roundId,
 					topic: message.topic,
 					allowedChoices: message.allowedChoices,
+					votingTimeSeconds: message.votingTimeSeconds || 100,
 					phase: 'VOTING',
 					startTime: message.startTime,
 					from: message.from
@@ -1265,10 +1278,17 @@ class VotingNodeWithAutoGUI {
 
     // === VOTING ROUNDS ===
 
-    startVotingRound(topic, allowedChoices = null) {
+    startVotingRound(topic, allowedChoices = null, votingTimeSeconds = 100) {
         if (this.currentRound && this.currentRound.phase !== 'FINISHED') {
             console.log('A voting round is already active!');
             return;
+        }
+
+        // Validate voting time: min 30 seconds, max 600 seconds (10 minutes), default 100 seconds
+        if (typeof votingTimeSeconds !== 'number' || votingTimeSeconds < 30 || votingTimeSeconds > 600) {
+            console.log(`⚠️ Invalid voting time: ${votingTimeSeconds}s. Using default 100 seconds.`);
+            console.log('   Valid range: 30-600 seconds (0.5-10 minutes)');
+            votingTimeSeconds = 100;
         }
 
         const roundId = `round_${Date.now()}_${this.nodeId}`;
@@ -1277,7 +1297,8 @@ class VotingNodeWithAutoGUI {
             topic: topic,
             allowedChoices: allowedChoices,
             startTime: Date.now(),
-            duration: 5 * 60 * 1000,
+            duration: votingTimeSeconds * 1000, // Convert to milliseconds
+            votingTimeSeconds: votingTimeSeconds, // Store original seconds for reference
             phase: 'VOTING',
             votes: new Map(),
             results: null,
@@ -1301,6 +1322,7 @@ class VotingNodeWithAutoGUI {
             roundId: roundId,
             topic: topic,
             allowedChoices: allowedChoices,
+            votingTimeSeconds: votingTimeSeconds, // Include voting time in broadcast
             startTime: round.startTime,
             from: this.nodeId
         });
@@ -1311,13 +1333,15 @@ class VotingNodeWithAutoGUI {
             console.log(`Allowed choices: ${allowedChoices.join(', ')}`);
         }
         console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-        console.log(`Duration: 5 minutes`);
+        console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
         console.log(`Active nodes: ${this.getActiveNodeCount()}`);
         console.log(`Type 'vote <choice>' to cast your encrypted vote`);
         
-        // Schedule phase transitions
-        this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), 60 * 1000);
-        this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), 5 * 60 * 1000);
+        // Schedule phase transitions with custom timing
+        // Consensus phase starts at 80% of voting time
+        const consensusDelay = Math.round(votingTimeSeconds * 0.8 * 1000);
+        this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
+        this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), round.duration);
         
         return roundId;
     }
@@ -1330,12 +1354,16 @@ class VotingNodeWithAutoGUI {
         if (!this.currentRound || this.currentRound.startTime < message.startTime) {
             console.log(`✅ Accepting new round from ${message.from}`);
             
+            // Get voting time from message, with fallback to default
+            const votingTimeSeconds = message.votingTimeSeconds || 100;
+            
             this.currentRound = {
                 id: message.roundId,
                 topic: message.topic,
                 allowedChoices: message.allowedChoices,
                 startTime: message.startTime,
-                duration: 5 * 60 * 1000,
+                duration: votingTimeSeconds * 1000, // Convert to milliseconds
+                votingTimeSeconds: votingTimeSeconds,
                 phase: 'VOTING',
                 votes: new Map(),
                 results: null,
@@ -1358,13 +1386,14 @@ class VotingNodeWithAutoGUI {
                 console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
             }
             console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
+            console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
             console.log(`Started by: ${message.from}`);
             console.log(`Type 'vote <choice>' to cast your encrypted vote`);
             
-            // Schedule phase transitions for this node too
+            // Schedule phase transitions for this node too with custom timing
             const elapsed = Date.now() - message.startTime;
-            const consensusDelay = Math.max(100, (60 * 1000) - elapsed);
-            const finishDelay = Math.max(100, (5 * 60 * 1000) - elapsed);
+            const consensusDelay = Math.max(100, Math.round(votingTimeSeconds * 0.8 * 1000) - elapsed);
+            const finishDelay = Math.max(100, (votingTimeSeconds * 1000) - elapsed);
             
             this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
             this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
@@ -1702,7 +1731,7 @@ class VotingNodeWithAutoGUI {
         return {
             topic: this.currentRound.topic,
             phase: this.currentRound.phase,
-            timeRemaining: Math.ceil(remaining / 1000),
+            timeRemaining: Math.floor(remaining / 1000), // Use Math.floor for smooth countdown
             encryptedVoteCount: encryptedVotes ? encryptedVotes.size : 0,
             decryptedVoteCount: decryptedVotes ? decryptedVotes.size : 0,
             activeNodes: this.getActiveNodeCount()
@@ -1757,16 +1786,37 @@ class VotingNodeWithAutoGUI {
                 
             case 'start':
                 if (args.length === 0) {
-                    console.log('Usage: start <topic> [choice1,choice2,choice3]');
+                    console.log('Usage: start <topic> [choice1,choice2,choice3] [time_in_seconds]');
+                    console.log('');
+                    console.log('Parameters:');
+                    console.log('  topic              : The voting topic/question');
+                    console.log('  choices (optional) : Comma-separated list of allowed choices');
+                    console.log('  time (optional)    : Voting duration in seconds (30-600, default: 100)');
+                    console.log('');
                     console.log('Examples:');
-                    console.log('  start "Should we deploy?" yes,no');
-                    console.log('  start "Pick a color" red,blue,green,yellow');
-                    console.log('  start "Free text question"  (no choices = any answer allowed)');
+                    console.log('  start "Should we deploy?" yes,no                     # 100 seconds (default)');
+                    console.log('  start "Should we deploy?" yes,no 60                 # 60 seconds');
+                    console.log('  start "Pick a color" red,blue,green,yellow 180      # 3 minutes');
+                    console.log('  start "Free text question" 120                      # 2 minutes, any answer');
+                    console.log('  start "Quick poll" yes,no 30                        # 30 seconds (minimum)');
+                    console.log('  start "Long discussion" agree,disagree,neutral 600  # 10 minutes (maximum)');
                     break;
                 }
                 
-                let topic, allowedChoices = null;
+                let topic, allowedChoices = null, votingTime = 100;
                 
+                // Parse arguments: topic [choices] [time]
+                // Look for numeric values that could be time
+                const lastArg = args[args.length - 1];
+                const secondLastArg = args.length > 1 ? args[args.length - 2] : null;
+                
+                // Check if last argument is a number (voting time)
+                if (/^\d+$/.test(lastArg)) {
+                    votingTime = parseInt(lastArg);
+                    args = args.slice(0, -1); // Remove time from args
+                }
+                
+                // Check if remaining last argument contains commas (choices)
                 if (args.length > 1 && args[args.length - 1].includes(',')) {
                     allowedChoices = args.pop().split(',').map(choice => choice.trim());
                     topic = args.join(' ');
@@ -1774,7 +1824,7 @@ class VotingNodeWithAutoGUI {
                     topic = args.join(' ');
                 }
                 
-                this.startVotingRound(topic, allowedChoices);
+                this.startVotingRound(topic, allowedChoices, votingTime);
                 break;
                 
             case 'vote':
