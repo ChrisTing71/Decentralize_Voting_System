@@ -1,0 +1,20 @@
+# Dockerfile for Voting Node
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm install
+
+# Copy application files
+COPY voting-node.js ./
+COPY voting-gui.html ./
+
+# Expose ports for WebSocket and UDP discovery
+# Port will be specified at runtime
+EXPOSE 3000-4000
+EXPOSE 41234/udp
+
+# Run the voting node
+ENTRYPOINT ["node", "voting-node.js"]

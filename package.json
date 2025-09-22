@@ -1,8 +1,29 @@
 {
+  "name": "p2p-voting-system",
+  "version": "1.0.0",
+  "description": "Decentralized P2P voting system with Docker support",
+  "main": "voting-node.js",
+  "scripts": {
+    "start": "node manager-docker.js",
+    "build-images": "docker build -t voting-node:latest -f Dockerfile.node . && docker build -t voting-manager:latest -f Dockerfile.manager .",
+    "dev": "node manager.js",
+    "docker-up": "docker-compose up -d",
+    "docker-down": "docker-compose down",
+    "docker-clean": "docker-compose down -v && docker rmi voting-node:latest voting-manager:latest"
+  },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "open": "^10.2.0",
-    "ws": "^8.18.3"
-  }
+    "dockerode": "^4.0.8",
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  },
+  "keywords": [
+    "p2p",
+    "voting",
+    "blockchain",
+    "distributed",
+    "docker"
+  ],
+  "author": "",
+  "license": "MIT"
 }
