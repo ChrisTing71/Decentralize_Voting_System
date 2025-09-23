@@ -291,6 +291,54 @@ Write-Host ""
 Write-Host "Press Ctrl+C to stop the manager" -ForegroundColor Yellow
 Write-Host ""
 
+# Function to open URL in default browser
+function Open-Browser {
+    param($Url)
+    try {
+        # Try different methods to open browser
+        if ($IsWindows -or $PSVersionTable.Platform -eq 'Win32NT' -or (-not $PSVersionTable.Platform)) {
+            # Windows
+            Start-Process $Url
+        } elseif ($IsMacOS -or $PSVersionTable.Platform -eq 'Unix' -and (uname) -eq 'Darwin') {
+            # macOS
+            & open $Url
+        } else {
+            # Linux
+            & xdg-open $Url
+        }
+        Show-Success "Browser opened with manager interface"
+    } catch {
+        Show-Warning "Could not auto-open browser. Please navigate to: $Url"
+    }
+}
+
+# Function to wait for manager to be ready
+function Wait-ForManager {
+    param($Url, $MaxAttempts = 30)
+    
+    Show-Info "Waiting for manager service to be ready..."
+    
+    for ($i = 1; $i -le $MaxAttempts; $i++) {
+        try {
+            $response = Invoke-WebRequest -Uri "$Url/api/health" -Method Get -UseBasicParsing -TimeoutSec 2 -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                Show-Success "Manager service is ready!"
+                return $true
+            }
+        } catch {
+            # Service not ready yet
+        }
+        
+        if ($i % 5 -eq 0) {
+            Write-Host "   Still waiting... ($i/$MaxAttempts)" -ForegroundColor Gray
+        }
+        Start-Sleep -Seconds 1
+    }
+    
+    Show-Warning "Manager service took longer than expected to start"
+    return $false
+}
+
 # Function to cleanup on exit
 function Cleanup {
     Write-Host ""
@@ -314,13 +362,50 @@ try {
     # Set console control handler
     [Console]::TreatControlCAsInput = $false
     
-    # Run the manager
-    try {
+    # Start the manager in background job
+    Show-Info "Starting manager service..."
+    $managerJob = Start-Job -ScriptBlock {
+        Set-Location $using:PWD
         node manager-docker.js
-    } catch {
-        Write-Host ""
-        Show-Error "Manager exited with error: $_"
     }
+    
+    # Wait for manager to be ready
+    $managerUrl = "http://localhost:8080"
+    if (Wait-ForManager -Url $managerUrl) {
+        # Open browser automatically
+        $fullUrl = "$managerUrl/register-docker.html"
+        Write-Host ""
+        Show-Info "Opening browser with manager interface..."
+        Open-Browser -Url $fullUrl
+        Write-Host ""
+        Write-Host "======================================" -ForegroundColor Green
+        Write-Host "Manager is running at:" -ForegroundColor Green
+        Write-Host "$fullUrl" -ForegroundColor Cyan
+        Write-Host "======================================" -ForegroundColor Green
+    }
+    
+    # Keep displaying manager output
+    Write-Host ""
+    Write-Host "Manager logs:" -ForegroundColor Cyan
+    Write-Host "-------------" -ForegroundColor Gray
+    
+    # Stream the job output
+    while ($managerJob.State -eq 'Running') {
+        Receive-Job -Job $managerJob
+        Start-Sleep -Milliseconds 100
+    }
+    
+    # Get any remaining output
+    Receive-Job -Job $managerJob
+    
+} catch {
+    Write-Host ""
+    Show-Error "Manager exited with error: $_"
 } finally {
+    # Clean up the job
+    if ($managerJob) {
+        Stop-Job -Job $managerJob -ErrorAction SilentlyContinue
+        Remove-Job -Job $managerJob -Force -ErrorAction SilentlyContinue
+    }
     Cleanup
 }
