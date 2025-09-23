@@ -1071,14 +1071,24 @@ class VotingNodeWithAutoGUI {
 		console.log('\n=== CONSENSUS PHASE ===');
 		console.log('🔓 Revealing anonymous votes and calculating results...');
 		
-		// Share ALL decryption keys in a batch to break correlation
-		this.shareAllKeys();
+		// Broadcast phase change to ensure all nodes know we're in consensus
+		this.broadcast({
+			type: 'PHASE_CHANGE',
+			phase: 'CONSENSUS',
+			roundId: this.currentRound.id,
+			from: this.nodeId
+		});
 		
-		// We now have dedicated consensus time, so use simpler timing
-		setTimeout(() => this.checkIfReadyToPropose(), 3000);  // Fixed 3 seconds to start
-		console.log(`� Consensus phase started (15s dedicated time)`);
+		// Share decryption keys after a small delay to ensure all nodes are ready
+		setTimeout(() => {
+			this.shareAllKeys();
+		}, 1000); // 1 second delay to ensure all nodes have entered consensus
 		
-		// ENHANCED: Notify GUI clients of phase change
+		// Start checking if ready to propose results
+		setTimeout(() => this.checkIfReadyToPropose(), 5000); // Start checking after 5 seconds
+		console.log(`⏱️ Consensus phase started (15s dedicated time)`);
+		
+		// Notify GUI clients of phase change
 		this.notifyGUIClients('PHASE_CHANGE', {
 			phase: 'CONSENSUS',
 			roundId: this.currentRound.id,
@@ -1088,33 +1098,47 @@ class VotingNodeWithAutoGUI {
 
 
     shareAllKeys() {
-        // Collect ALL decryption keys from all nodes (including our own)
-        const allKeys = [];
-        
-        // Add our own keys
-        const roundKeys = this.voteKeys.get(this.currentRound.id);
-        if (roundKeys) {
-            for (const [anonymousVoteId, keyData] of roundKeys) {
-                allKeys.push({
-                    anonymousVoteId: anonymousVoteId,
-                    key: keyData.key
-                });
-            }
-        }
-        
-        // Shuffle the keys to break any correlation with submission order
-        this.shuffleArray(allKeys);
-        
-        // Broadcast all keys together with a shorter, more consistent delay
-        setTimeout(() => {
-            this.broadcast({
-                type: 'BATCH_VOTE_KEYS',
-                roundId: this.currentRound.id,
-                keys: allKeys,
-                from: this.nodeId
-            });
-        }, Math.random() * 1000 + 500); // Random delay 0.5-1.5 seconds (shorter and more consistent)
-    }
+		const roundKeys = this.voteKeys.get(this.currentRound.id);
+		
+		// Only share keys if we actually have any
+		if (!roundKeys || roundKeys.size === 0) {
+			console.log('📭 No keys to share for this round');
+			return;
+		}
+		
+		// Collect our keys to share
+		const keysToShare = [];
+		for (const [anonymousVoteId, keyData] of roundKeys) {
+			// Only share keys where we are the original submitter
+			if (keyData.submittedBy === this.nodeId) {
+				keysToShare.push({
+					anonymousVoteId: anonymousVoteId,
+					key: keyData.key
+				});
+			}
+		}
+		
+		if (keysToShare.length === 0) {
+			console.log('📭 No keys from our votes to share');
+			return;
+		}
+		
+		// Shuffle the keys to break any correlation with submission order
+		this.shuffleArray(keysToShare);
+		
+		console.log(`🔑 Preparing to share ${keysToShare.length} decryption keys`);
+		
+		// Broadcast keys with a random delay
+		setTimeout(() => {
+			this.broadcast({
+				type: 'BATCH_VOTE_KEYS',
+				roundId: this.currentRound.id,
+				keys: keysToShare,
+				from: this.nodeId
+			});
+			console.log(`📤 Shared ${keysToShare.length} decryption keys with network`);
+		}, Math.random() * 1000 + 500); // Random delay 0.5-1.5 seconds
+	}
 
     shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -1373,62 +1397,66 @@ class VotingNodeWithAutoGUI {
         return roundId;
     }
 	
-    handleRoundStart(message) {
-        console.log(`🔄 Handling ROUND_START from ${message.from}`);
-        console.log(`Current round: ${this.currentRound ? this.currentRound.id : 'none'}`);
-        console.log(`Incoming round: ${message.roundId}`);
-        
-        if (!this.currentRound || this.currentRound.startTime < message.startTime) {
-            console.log(`✅ Accepting new round from ${message.from}`);
-            
-            // Get voting time from message, with fallback to default
-            const votingTimeSeconds = message.votingTimeSeconds || 100;
-            
-            this.currentRound = {
-                id: message.roundId,
-                topic: message.topic,
-                allowedChoices: message.allowedChoices,
-                startTime: message.startTime,
-                duration: votingTimeSeconds * 1000, // Convert to milliseconds
-                votingTimeSeconds: votingTimeSeconds,
-                phase: 'VOTING',
-                votes: new Map(),
-                results: null,
-                consensusAchieved: false,
-                consensusNodes: new Set(),
-                consensusTimeout: null,
-                finishTimeout: null
-            };
-            
-            this.votes.set(message.roundId, new Map());
-            this.encryptedVotes.set(message.roundId, new Map());
-            this.voteKeys.set(message.roundId, new Map());
-            this.resultProposed = false; // Initialize result proposal flag
-            this.keysSharingComplete = false; // Initialize keys sharing flag
-            this.hasVotedInRound.set(message.roundId, false); // Initialize voting status for this round
-            
-            console.log(`\n=== JOINED VOTING ROUND ===`);
-            console.log(`Topic: ${message.topic}`);
-            if (message.allowedChoices) {
-                console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
-            }
-            console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-            console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
-            console.log(`Started by: ${message.from}`);
-            console.log(`Type 'vote <choice>' to cast your encrypted vote`);
-            
-            // Schedule phase transitions for this node too with custom timing
-            const elapsed = Date.now() - message.startTime;
-            const consensusDelay = Math.max(100, Math.round(votingTimeSeconds * 0.8 * 1000) - elapsed);
-            const finishDelay = Math.max(100, (votingTimeSeconds * 1000) - elapsed);
-            
-            this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
-            this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
-            
-        } else {
-            console.log(`❌ Ignoring round start (older or same timestamp)`);
-        }
-    }
+	handleRoundStart(message) {
+		console.log(`🔄 Handling ROUND_START from ${message.from}`);
+		console.log(`Current round: ${this.currentRound ? this.currentRound.id : 'none'}`);
+		console.log(`Incoming round: ${message.roundId}`);
+		
+		if (!this.currentRound || this.currentRound.startTime < message.startTime) {
+			console.log(`✅ Accepting new round from ${message.from}`);
+			
+			const votingTimeSeconds = message.votingTimeSeconds || 100;
+			const votingPhaseMs = votingTimeSeconds * 1000;
+			const consensusPhaseMs = 15000; // Fixed 15 seconds for consensus
+			
+			this.currentRound = {
+				id: message.roundId,
+				topic: message.topic,
+				allowedChoices: message.allowedChoices,
+				startTime: message.startTime,
+				duration: votingPhaseMs + consensusPhaseMs,
+				votingTimeSeconds: votingTimeSeconds,
+				votingPhaseMs: votingPhaseMs,
+				consensusPhaseMs: consensusPhaseMs,
+				phase: 'VOTING',
+				votes: new Map(),
+				results: null,
+				consensusAchieved: false,
+				consensusNodes: new Set(),
+				consensusTimeout: null,
+				finishTimeout: null
+			};
+			
+			this.votes.set(message.roundId, new Map());
+			this.encryptedVotes.set(message.roundId, new Map());
+			this.voteKeys.set(message.roundId, new Map());
+			this.resultProposed = false;
+			this.keysSharingComplete = false;
+			this.hasVotedInRound.set(message.roundId, false);
+			
+			console.log(`\n=== JOINED VOTING ROUND ===`);
+			console.log(`Topic: ${message.topic}`);
+			if (message.allowedChoices) {
+				console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
+			}
+			console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
+			console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds`);
+			console.log(`Started by: ${message.from}`);
+			console.log(`Type 'vote <choice>' to cast your encrypted vote`);
+			
+			// Calculate when to enter consensus phase based on elapsed time
+			const elapsed = Date.now() - message.startTime;
+			const consensusDelay = Math.max(100, votingPhaseMs - elapsed);
+			const finishDelay = Math.max(100, (votingPhaseMs + consensusPhaseMs) - elapsed);
+			
+			console.log(`⏲️ Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
+			
+			this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
+			this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
+		} else {
+			console.log(`❌ Ignoring round start (older or same timestamp)`);
+		}
+	}
 
     checkIfReadyToPropose() {
         if (!this.currentRound || this.currentRound.phase !== 'CONSENSUS' || this.resultProposed) {
