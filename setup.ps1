@@ -344,68 +344,57 @@ function Cleanup {
     Write-Host ""
     Write-Host "Shutting down..." -ForegroundColor Yellow
     
-    $response = Read-Host "Stop all running voting node containers? (y/n)"
-    if ($response -eq 'y' -or $response -eq 'Y') {
-        $runningContainers = docker ps --filter "name=voting-node" --format "{{.Names}}"
-        if ($runningContainers) {
+    # First, clean up ALL voting node containers directly
+    Write-Host "Checking for running containers..." -ForegroundColor Yellow
+    $runningContainers = docker ps --filter "name=voting-node" --format "{{.Names}}"
+    
+    if ($runningContainers) {
+        Write-Host "Found running containers:" -ForegroundColor Yellow
+        $runningContainers | ForEach-Object { Write-Host "  - $_" -ForegroundColor Gray }
+        
+        $response = Read-Host "Stop and remove all voting node containers? (y/n)"
+        if ($response -eq 'y' -or $response -eq 'Y') {
             Show-Info "Stopping containers..."
             docker stop $runningContainers 2>&1 | Out-Null
-            Show-Success "Containers stopped"
+            Show-Info "Removing containers..."
+            docker rm $runningContainers 2>&1 | Out-Null
+            Show-Success "Containers cleaned up"
         }
+    } else {
+        Write-Host "No containers to clean up" -ForegroundColor Gray
     }
     
     exit 0
 }
 
-# Register cleanup handler for Ctrl+C
+# Alternative: Run manager directly with trap for Ctrl+C
+trap {
+    Write-Host "`n`nCtrl+C detected - initiating shutdown..." -ForegroundColor Yellow
+    
+    # Kill all node processes (manager)
+    Get-Process -Name "node" -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -like "*manager-docker.js*"
+    } | Stop-Process -Force -ErrorAction SilentlyContinue
+    
+    Cleanup
+}
+
+# Launch browser after a delay
+Show-Info "Browser will open in 3 seconds..."
+Start-Job -ScriptBlock {
+    Start-Sleep -Seconds 3
+    Start-Process "http://localhost:8080/register-docker.html"
+} | Out-Null
+
+Write-Host "Press Ctrl+C to stop the manager and clean up containers" -ForegroundColor Yellow
+Write-Host ""
+
+# Run the manager directly (not in a background job)
 try {
-    # Set console control handler
-    [Console]::TreatControlCAsInput = $false
-    
-    # Start the manager in background job
-    Show-Info "Starting manager service..."
-    $managerJob = Start-Job -ScriptBlock {
-        Set-Location $using:PWD
-        node manager-docker.js
-    }
-    
-    # Wait for manager to be ready
-    $managerUrl = "http://localhost:8080"
-    if (Wait-ForManager -Url $managerUrl) {
-        # Open browser automatically
-        $fullUrl = "$managerUrl/register-docker.html"
-        Write-Host ""
-        Show-Info "Opening browser with manager interface..."
-        Open-Browser -Url $fullUrl
-        Write-Host ""
-        Write-Host "======================================" -ForegroundColor Green
-        Write-Host "Manager is running at:" -ForegroundColor Green
-        Write-Host "$fullUrl" -ForegroundColor Cyan
-        Write-Host "======================================" -ForegroundColor Green
-    }
-    
-    # Keep displaying manager output
-    Write-Host ""
-    Write-Host "Manager logs:" -ForegroundColor Cyan
-    Write-Host "-------------" -ForegroundColor Gray
-    
-    # Stream the job output
-    while ($managerJob.State -eq 'Running') {
-        Receive-Job -Job $managerJob
-        Start-Sleep -Milliseconds 100
-    }
-    
-    # Get any remaining output
-    Receive-Job -Job $managerJob
-    
+    node manager-docker.js
 } catch {
     Write-Host ""
     Show-Error "Manager exited with error: $_"
 } finally {
-    # Clean up the job
-    if ($managerJob) {
-        Stop-Job -Job $managerJob -ErrorAction SilentlyContinue
-        Remove-Job -Job $managerJob -Force -ErrorAction SilentlyContinue
-    }
     Cleanup
 }
