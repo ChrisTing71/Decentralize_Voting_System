@@ -345,19 +345,35 @@ class VotingNodeWithAutoGUI {
     }
 	
 	broadcastPresence() {
-        const message = JSON.stringify({
-            nodeId: this.nodeId,
-            port: this.port // This is our WebSocket port
-        });
-        const messageBuffer = Buffer.from(message);
+		const message = JSON.stringify({
+			nodeId: this.nodeId,
+			port: this.port // This is our WebSocket port
+		});
+		const messageBuffer = Buffer.from(message);
 
-        // Broadcast to the entire LAN
-        this.discoverySocket.send(messageBuffer, 0, messageBuffer.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
-            if (err) {
-                console.error('Failed to broadcast presence:', err);
-            }
-        });
-    }
+		// Get broadcast address from environment variable or use default
+		const broadcastAddress = process.env.BROADCAST_ADDRESS || '255.255.255.255';
+		
+		// In Docker containers, we might need to use the network-specific broadcast
+		// For voting-network (172.20.0.0/16), the broadcast is 172.20.255.255
+		
+		// Broadcast to the network
+		this.discoverySocket.send(messageBuffer, 0, messageBuffer.length, DISCOVERY_PORT, broadcastAddress, (err) => {
+			if (err) {
+				// If general broadcast fails, try Docker network broadcast
+				if (broadcastAddress === '255.255.255.255') {
+					// Try Docker network broadcast address
+					this.discoverySocket.send(messageBuffer, 0, messageBuffer.length, DISCOVERY_PORT, '172.20.255.255', (err2) => {
+						if (err2) {
+							console.error('Failed to broadcast presence:', err2);
+						}
+					});
+				} else {
+					console.error('Failed to broadcast presence:', err);
+				}
+			}
+		});
+	}
     
     async connectToKnownPeers() {
         console.log(`🌐 Connecting to ${this.knownPeers.length} known peers...`);

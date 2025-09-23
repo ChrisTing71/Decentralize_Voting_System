@@ -16,5 +16,6 @@ COPY voting-gui.html ./
 EXPOSE 3000-4000
 EXPOSE 41234/udp
 
-# Run the voting node
+# Use stdin_open and tty equivalent in Docker
+# The -i flag keeps stdin open even if not attached
 ENTRYPOINT ["node", "voting-node.js"]

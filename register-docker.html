@@ -486,13 +486,16 @@
                     `;
                     listContainer.appendChild(item);
                     
-                    if (node.port > maxPort) {
-                        maxPort = node.port;
+                    // Convert port to number before comparison
+                    const nodePort = parseInt(node.port);
+                    if (nodePort > maxPort) {
+                        maxPort = nodePort;
                     }
                 });
 
-                // Suggest next available port
-                portInput.value = maxPort > 0 ? maxPort + 1 : defaultPort;
+                // Suggest next available port (ensure we're adding numbers, not concatenating strings)
+                const nextPort = maxPort > 0 ? parseInt(maxPort) + 1 : defaultPort;
+                portInput.value = nextPort;
 
             } catch (error) {
                 console.error('Error fetching nodes:', error);

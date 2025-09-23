@@ -161,24 +161,23 @@ app.post('/api/launch-node', async (req, res) => {
                 
                 // Find if this peer is a container
                 const peerNode = Object.entries(containerNodes)
-                    .find(([_, info]) => info.port === parseInt(peerPort));
+                    .find(([_, info]) => info.port === parseInt(peerPort || peer));
                 
                 if (peerNode) {
-                    const peerIP = await getContainerIP(`voting-node-${peerNode[0]}`);
+                    // Get the container's IP within the Docker network
+                    const peerContainerName = `voting-node-${peerNode[0]}`;
+                    const peerIP = await getContainerIP(peerContainerName);
                     if (peerIP && peerIP !== 'localhost') {
-                        peerConnections.push(`${peerIP}:${peerPort}`);
+                        // Use the container's internal IP and its internal port (port)
+                        peerConnections.push(`${peerIP}:${peerNode[1].port}`);
+                        console.log(`Peer ${peerNode[0]} will be accessed at ${peerIP}:${peerNode[1].port}`);
                     } else {
-                        // Fallback to localhost
-                        peerConnections.push(`host.docker.internal:${peerPort}`);
+                        // Fallback to container name (Docker DNS)
+                        peerConnections.push(`${peerContainerName}:${peerNode[1].port}`);
                     }
                 } else {
-                    // Use host.docker.internal for host connections on Windows/Mac
-                    if (process.platform === 'win32' || process.platform === 'darwin') {
-                        peerConnections.push(`host.docker.internal:${peerPort}`);
-                    } else {
-                        // Linux doesn't have host.docker.internal by default
-                        peerConnections.push(`172.17.0.1:${peerPort}`);
-                    }
+                    // For non-container peers, don't try to connect (they're outside the network)
+                    console.log(`Warning: Peer on port ${peerPort || peer} is not a container, skipping`);
                 }
             }
         }
@@ -197,14 +196,19 @@ app.post('/api/launch-node', async (req, res) => {
             Image: 'voting-node:latest',
             name: containerName,
             Hostname: nodeName,
+            Tty: true,           // Allocate a pseudo-TTY
+            OpenStdin: true,     // Keep stdin open
+            AttachStdin: false,  // Don't attach stdin
+            AttachStdout: false, // Don't attach stdout  
+            AttachStderr: false, // Don't attach stderr
             ExposedPorts: {
                 [`${port}/tcp`]: {},
-                '41234/udp': {}  // UDP discovery port
+                '41234/udp': {}  // UDP discovery port - same for all containers
             },
             HostConfig: {
                 PortBindings: {
-                    [`${port}/tcp`]: [{ HostPort: port.toString() }],
-                    '41234/udp': [{ HostPort: '41234' }]  // Map UDP port
+                    [`${port}/tcp`]: [{ HostPort: port.toString() }]
+                    // Don't map UDP port to host - let containers communicate internally
                 },
                 NetworkMode: networkMode,
                 RestartPolicy: { Name: 'no' },
@@ -213,7 +217,8 @@ app.post('/api/launch-node', async (req, res) => {
             Env: [
                 `NODE_NAME=${nodeName}`,
                 `NODE_PORT=${port}`,
-                `PEERS=${peerConnections.join(' ')}`
+                `PEERS=${peerConnections.join(' ')}`,
+                `BROADCAST_ADDRESS=172.20.255.255`  // Broadcast address for voting-network
             ],
             Cmd: [nodeName, port.toString(), ...peerConnections]
         });
@@ -345,15 +350,27 @@ async function ensureNetwork() {
             await docker.createNetwork({
                 Name: 'voting-network',
                 Driver: 'bridge',
+                EnableIPv6: false,
                 IPAM: {
+                    Driver: 'default',
                     Config: [{
-                        Subnet: '172.20.0.0/16'
+                        Subnet: '172.20.0.0/16',
+                        Gateway: '172.20.0.1'
                     }]
+                },
+                Options: {
+                    'com.docker.network.bridge.enable_icc': 'true',  // Enable inter-container communication
+                    'com.docker.network.bridge.enable_ip_masquerade': 'true'
                 }
             });
-            console.log('✅ Network created');
+            console.log('✅ Network created with subnet 172.20.0.0/16');
         } else {
             console.log('✅ Network already exists');
+            // Log network details for debugging
+            const networkDetails = await docker.getNetwork('voting-network').inspect();
+            if (networkDetails.IPAM && networkDetails.IPAM.Config && networkDetails.IPAM.Config[0]) {
+                console.log(`   Subnet: ${networkDetails.IPAM.Config[0].Subnet}`);
+            }
         }
         
         // Also try to build the image if it doesn't exist
