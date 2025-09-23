@@ -111,6 +111,7 @@
             .status-item {
                 text-align: center;
                 min-width: 100px;
+                position: relative;
             }
 
             .status-label {
@@ -121,6 +122,45 @@
             .status-value {
                 font-size: 1.2em;
                 font-weight: bold;
+            }
+
+            /* Enhanced timer styling */
+            .timer-container {
+                position: relative;
+            }
+
+            .timer-value {
+                transition: color 0.3s ease;
+            }
+
+            .timer-value.warning {
+                color: #ff6b35 !important;
+                animation: pulse-warning 1s infinite;
+            }
+
+            .timer-value.critical {
+                color: #ff1744 !important;
+                animation: pulse-critical 0.5s infinite;
+            }
+
+            .timer-progress {
+                position: absolute;
+                bottom: -2px;
+                left: 0;
+                height: 3px;
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 1.5px;
+                transition: width 1s linear;
+            }
+
+            @keyframes pulse-warning {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+
+            @keyframes pulse-critical {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
             }
 
             .grid {
@@ -408,7 +448,10 @@
                     </div>
                     <div class="status-item">
                         <div class="status-label">Time Remaining</div>
-                        <div class="status-value" id="timeRemaining">-</div>
+                        <div class="status-value timer-container">
+                            <span class="timer-value" id="timeRemaining">-</span>
+                            <div class="timer-progress" id="timerProgress"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -418,6 +461,11 @@
                         <div class="form-group">
                             <label for="voteTopicInput">Topic</label>
                             <textarea id="voteTopicInput" rows="3" placeholder="Enter your voting topic..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="votingTimeInput">Voting Duration (30-600 seconds)</label>
+                            <input type="number" id="votingTimeInput" min="30" max="600" value="100" placeholder="100">
+                            <small style="color: #666; font-size: 0.9em;">Default: 100 seconds, Min: 30 seconds, Max: 600 seconds (+ 15s consensus)</small>
                         </div>
                         <div class="form-group">
                             <label for="choicesInput">Allowed Choices (optional)</label>
@@ -470,6 +518,13 @@
             let selectedChoice = null;
             let reconnectAttempts = 0;
             let maxReconnectAttempts = 5;
+            
+            // Timer-related variables
+            let timerInterval = null;
+            let roundStartTime = null;
+            let roundDuration = null;
+            let lastServerTime = null;
+            let lastDisplayedTime = null; // Track last displayed time to detect jumps
 
             // ENHANCED: Clear any existing localStorage/sessionStorage that might interfere
             function clearBrowserStorage() {
@@ -688,9 +743,17 @@
             function startVote() {
                 const topic = document.getElementById('voteTopicInput').value.trim();
                 const choices = document.getElementById('choicesInput').value.trim();
+                const votingTime = document.getElementById('votingTimeInput').value;
                 
                 if (!topic) {
                     alert('Please enter a voting topic');
+                    return;
+                }
+                
+                // Validate voting time
+                const time = parseInt(votingTime);
+                if (votingTime && (isNaN(time) || time < 30 || time > 600)) {
+                    alert('Voting time must be between 30 and 600 seconds');
                     return;
                 }
                 
@@ -698,12 +761,17 @@
                 if (choices) {
                     args.push(choices);
                 }
+                if (votingTime && votingTime !== '100') {
+                    // Add voting time as the last argument if it's not the default
+                    args.push(votingTime);
+                }
                 
                 sendCommand('start', args);
                 
                 // Clear form
                 document.getElementById('voteTopicInput').value = '';
                 document.getElementById('choicesInput').value = '';
+                document.getElementById('votingTimeInput').value = '100';
             }
 
             function castVote() {
@@ -792,7 +860,55 @@
                 document.getElementById('currentRound').textContent = status.roundTopic ? 
                     (status.roundTopic.length > 30 ? status.roundTopic.substring(0, 30) + '...' : status.roundTopic) : 'None';
                 document.getElementById('currentPhase').textContent = status.phase || '-';
-                document.getElementById('timeRemaining').textContent = status.timeRemaining ? `${status.timeRemaining}s` : '-';
+                
+                // Check if voting round is actually active (not finished/waiting)
+                const isActiveVotingPhase = status.phase && 
+                    (status.phase === 'VOTING' || status.phase === 'CONSENSUS' || status.phase === 'COLLECTING');
+                
+                // Minimal timer handling to prevent interference
+                if (status.timeRemaining !== undefined && status.timeRemaining > 0 && isActiveVotingPhase) {
+                    lastServerTime = status.timeRemaining;
+                    // ONLY sync if we don't have a timer running at all
+                    if (!timerInterval) {
+                        addLog(`⏰ Starting timer for active phase ${status.phase}: ${status.timeRemaining}s`);
+                        syncTimerWithServer(status.timeRemaining);
+                    }
+                    // CRITICAL: If we have a timer running, DO NOT SYNC AT ALL during voting
+                    // This completely prevents any 2-second jumps during countdown
+                } else if (status.timeRemaining !== undefined && status.timeRemaining <= 0) {
+                    // Server says time is up - but ONLY stop if we also think time should be up
+                    // Don't sync here to prevent premature stops
+                    if (!timerInterval) {
+                        // No timer running anyway, safe to update display
+                        const timerElement = document.getElementById('timeRemaining');
+                        const progressElement = document.getElementById('timerProgress');
+                        timerElement.textContent = '0s';
+                        timerElement.className = 'timer-value critical';
+                        if (progressElement) progressElement.style.width = '100%';
+                    }
+                    // If timer IS running, let it finish naturally - don't force stop
+                } else if (!isActiveVotingPhase) {
+                    // Phase is not active voting (FINISHED, WAITING, etc.) - stop timer
+                    if (timerInterval) {
+                        addLog(`⏹️ Stopping timer: phase changed to ${status.phase}`);
+                        stopTimer();
+                    }
+                    const timerElement = document.getElementById('timeRemaining');
+                    const progressElement = document.getElementById('timerProgress');
+                    timerElement.textContent = '-';
+                    timerElement.className = 'timer-value';
+                    if (progressElement) progressElement.style.width = '0%';
+                } else {
+                    // No active round
+                    if (timerInterval) {
+                        stopTimer();
+                    }
+                    const timerElement = document.getElementById('timeRemaining');
+                    const progressElement = document.getElementById('timerProgress');
+                    timerElement.textContent = '-';
+                    timerElement.className = 'timer-value';
+                    if (progressElement) progressElement.style.width = '0%';
+                }
                 
                 // Update peers list
                 if (status.peersList && status.peersList.length > 0) {
@@ -803,6 +919,115 @@
                 } else {
                     document.getElementById('peersList').innerHTML = '<div style="color: #666;">No peers connected</div>';
                 }
+            }
+            
+            // Timer management functions
+            function startTimer(durationSeconds) {
+                // Stop any existing timer
+                stopTimer();
+                
+                roundStartTime = Date.now();
+                roundDuration = durationSeconds * 1000; // Convert to milliseconds
+                
+                // Start 1-second interval timer
+                timerInterval = setInterval(updateTimerDisplay, 1000);
+                
+                // Update immediately
+                updateTimerDisplay();
+                
+                addLog(`⏰ Timer started: ${durationSeconds} seconds (client-side)`);
+            }
+            
+            function stopTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    addLog(`⏹️ Client timer stopped`);
+                }
+                roundStartTime = null;
+                roundDuration = null;
+                lastServerTime = null;
+                lastDisplayedTime = null;
+            }
+            
+            function updateTimerDisplay() {
+                const timerElement = document.getElementById('timeRemaining');
+                const progressElement = document.getElementById('timerProgress');
+                
+                if (!roundStartTime || !roundDuration || !timerElement) {
+                    if (timerElement) {
+                        timerElement.textContent = '-';
+                        timerElement.className = 'timer-value';
+                    }
+                    if (progressElement) progressElement.style.width = '0%';
+                    return;
+                }
+                
+                const elapsed = Date.now() - roundStartTime;
+                const remaining = Math.max(0, Math.floor((roundDuration - elapsed) / 1000));
+                
+                // Debug: Detect jumps in timer display
+                if (lastDisplayedTime !== null && lastDisplayedTime !== remaining) {
+                    const timeDiff = lastDisplayedTime - remaining;
+                    if (timeDiff > 1) {
+                        addLog(`⚠️ Timer jump detected: ${lastDisplayedTime}s → ${remaining}s (jump of ${timeDiff}s)`);
+                    }
+                }
+                lastDisplayedTime = remaining;
+                
+                // Update the display
+                timerElement.textContent = `${remaining}s`;
+                
+                // Calculate progress percentage
+                const progress = Math.max(0, Math.min(100, (elapsed / roundDuration) * 100));
+                if (progressElement) {
+                    progressElement.style.width = `${progress}%`;
+                }
+                
+                // Apply warning colors based on remaining time
+                timerElement.className = 'timer-value';
+                if (remaining <= 10 && remaining > 5) {
+                    timerElement.classList.add('warning');
+                } else if (remaining <= 5) {
+                    timerElement.classList.add('critical');
+                }
+                
+                // Stop timer when it reaches 0
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    timerElement.textContent = '0s';
+                    timerElement.className = 'timer-value critical';
+                    if (progressElement) progressElement.style.width = '100%';
+                    addLog('⏰ Client timer reached zero');
+                    
+                    // Clean up timer variables but don't reset to null yet 
+                    // in case server updates are still coming
+                    setTimeout(() => {
+                        if (!timerInterval) { // Only reset if timer is still stopped
+                            roundStartTime = null;
+                            roundDuration = null;
+                            lastDisplayedTime = null;
+                        }
+                    }, 2000);
+                }
+            }
+            
+            function syncTimerWithServer(serverTimeRemaining) {
+                // ULTRA-STRICT: Only handle the most basic edge cases
+                
+                if (serverTimeRemaining > 0 && !timerInterval) {
+                    // Case 1: No timer running but server says there should be one
+                    addLog(`⏰ Starting timer from server sync: ${serverTimeRemaining}s`);
+                    startTimer(serverTimeRemaining);
+                    return;
+                }
+                
+                // Case 2: Removed the forceful stop when server says time is up
+                // Let client timer finish naturally to prevent interruptions
+                
+                // ALL OTHER CASES: Do absolutely nothing
+                // This ensures the client timer runs completely independently
             }
 
             function handleRoundStart(message) {
@@ -815,7 +1040,14 @@
                 hasVoted = false;
                 selectedChoice = null;
                 
-                addLog(`🗳️ Voting round started: ${message.topic}`);
+                // Initialize client-side timer - always start fresh timer for new rounds
+                if (message.votingTimeSeconds) {
+                    addLog(`🗳️ Voting round started: ${message.topic} (${message.votingTimeSeconds}s)`);
+                    startTimer(message.votingTimeSeconds);
+                } else {
+                    addLog(`🗳️ Voting round started: ${message.topic}`);
+                }
+                
                 updateVotingInterface();
             }
 
@@ -823,6 +1055,14 @@
                 if (currentRoundData) {
                     currentRoundData.phase = message.phase;
                 }
+                
+                // Stop timer if round finished
+                if (message.phase === 'FINISHED' || message.phase === 'CONSENSUS') {
+                    if (message.phase === 'FINISHED') {
+                        stopTimer();
+                    }
+                }
+                
                 addLog(`🔄 Phase changed to: ${message.phase}`);
                 updateVotingInterface();
             }

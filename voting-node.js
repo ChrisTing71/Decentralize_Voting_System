@@ -345,19 +345,35 @@ class VotingNodeWithAutoGUI {
     }
 	
 	broadcastPresence() {
-        const message = JSON.stringify({
-            nodeId: this.nodeId,
-            port: this.port // This is our WebSocket port
-        });
-        const messageBuffer = Buffer.from(message);
+		const message = JSON.stringify({
+			nodeId: this.nodeId,
+			port: this.port // This is our WebSocket port
+		});
+		const messageBuffer = Buffer.from(message);
 
-        // Broadcast to the entire LAN
-        this.discoverySocket.send(messageBuffer, 0, messageBuffer.length, DISCOVERY_PORT, '255.255.255.255', (err) => {
-            if (err) {
-                console.error('Failed to broadcast presence:', err);
-            }
-        });
-    }
+		// Get broadcast address from environment variable or use default
+		const broadcastAddress = process.env.BROADCAST_ADDRESS || '255.255.255.255';
+		
+		// In Docker containers, we might need to use the network-specific broadcast
+		// For voting-network (172.20.0.0/16), the broadcast is 172.20.255.255
+		
+		// Broadcast to the network
+		this.discoverySocket.send(messageBuffer, 0, messageBuffer.length, DISCOVERY_PORT, broadcastAddress, (err) => {
+			if (err) {
+				// If general broadcast fails, try Docker network broadcast
+				if (broadcastAddress === '255.255.255.255') {
+					// Try Docker network broadcast address
+					this.discoverySocket.send(messageBuffer, 0, messageBuffer.length, DISCOVERY_PORT, '172.20.255.255', (err2) => {
+						if (err2) {
+							console.error('Failed to broadcast presence:', err2);
+						}
+					});
+				} else {
+					console.error('Failed to broadcast presence:', err);
+				}
+			}
+		});
+	}
     
     async connectToKnownPeers() {
         console.log(`🌐 Connecting to ${this.knownPeers.length} known peers...`);
@@ -632,6 +648,7 @@ class VotingNodeWithAutoGUI {
                 roundId: this.currentRound.id,
                 topic: this.currentRound.topic,
                 allowedChoices: this.currentRound.allowedChoices,
+                votingTimeSeconds: this.currentRound.votingTimeSeconds || 100,
                 phase: this.currentRound.phase
             }));
         }
@@ -650,19 +667,30 @@ class VotingNodeWithAutoGUI {
                 
             case 'start':
                 if (args.length === 0) {
-                    response = 'Usage: start <topic> [choice1,choice2,choice3]';
+                    response = 'Usage: start <topic> [choice1,choice2,choice3] [time_in_seconds]';
                 } else {
-                    let topic, allowedChoices = null;
+                    let topic, allowedChoices = null, votingTime = 100;
+                    let parsedArgs = [...args]; // Create a copy of args that we can modify
                     
-                    if (args.length > 1 && args[args.length - 1].includes(',')) {
-                        allowedChoices = args[args.length - 1].split(',').map(choice => choice.trim());
-                        topic = args.slice(0, -1).join(' ');
-                    } else {
-                        topic = args.join(' ');
+                    // Parse arguments similar to CLI
+                    const lastArg = parsedArgs[parsedArgs.length - 1];
+                    
+                    // Check if last argument is a number (voting time)
+                    if (/^\d+$/.test(lastArg)) {
+                        votingTime = parseInt(lastArg);
+                        parsedArgs = parsedArgs.slice(0, -1); // Remove time from args
                     }
                     
-                    this.startVotingRound(topic, allowedChoices);
-                    response = `Started voting round: ${topic}`;
+                    // Check if remaining last argument contains commas (choices)
+                    if (parsedArgs.length > 1 && parsedArgs[parsedArgs.length - 1].includes(',')) {
+                        allowedChoices = parsedArgs[parsedArgs.length - 1].split(',').map(choice => choice.trim());
+                        topic = parsedArgs.slice(0, -1).join(' ');
+                    } else {
+                        topic = parsedArgs.join(' ');
+                    }
+                    
+                    this.startVotingRound(topic, allowedChoices, votingTime);
+                    response = `Started voting round: ${topic} (${votingTime}s)`;
                 }
                 break;
                 
@@ -851,6 +879,7 @@ class VotingNodeWithAutoGUI {
 					roundId: message.roundId,
 					topic: message.topic,
 					allowedChoices: message.allowedChoices,
+					votingTimeSeconds: message.votingTimeSeconds || 100,
 					phase: 'VOTING',
 					startTime: message.startTime,
 					from: message.from
@@ -1042,12 +1071,24 @@ class VotingNodeWithAutoGUI {
 		console.log('\n=== CONSENSUS PHASE ===');
 		console.log('🔓 Revealing anonymous votes and calculating results...');
 		
-		// Share ALL decryption keys in a batch to break correlation
-		this.shareAllKeys();
+		// Broadcast phase change to ensure all nodes know we're in consensus
+		this.broadcast({
+			type: 'PHASE_CHANGE',
+			phase: 'CONSENSUS',
+			roundId: this.currentRound.id,
+			from: this.nodeId
+		});
 		
-		setTimeout(() => this.checkIfReadyToPropose(), 10000);
+		// Share decryption keys after a small delay to ensure all nodes are ready
+		setTimeout(() => {
+			this.shareAllKeys();
+		}, 1000); // 1 second delay to ensure all nodes have entered consensus
 		
-		// ENHANCED: Notify GUI clients of phase change
+		// Start checking if ready to propose results
+		setTimeout(() => this.checkIfReadyToPropose(), 5000); // Start checking after 5 seconds
+		console.log(`⏱️ Consensus phase started (15s dedicated time)`);
+		
+		// Notify GUI clients of phase change
 		this.notifyGUIClients('PHASE_CHANGE', {
 			phase: 'CONSENSUS',
 			roundId: this.currentRound.id,
@@ -1057,33 +1098,47 @@ class VotingNodeWithAutoGUI {
 
 
     shareAllKeys() {
-        // Collect ALL decryption keys from all nodes (including our own)
-        const allKeys = [];
-        
-        // Add our own keys
-        const roundKeys = this.voteKeys.get(this.currentRound.id);
-        if (roundKeys) {
-            for (const [anonymousVoteId, keyData] of roundKeys) {
-                allKeys.push({
-                    anonymousVoteId: anonymousVoteId,
-                    key: keyData.key
-                });
-            }
-        }
-        
-        // Shuffle the keys to break any correlation with submission order
-        this.shuffleArray(allKeys);
-        
-        // Broadcast all keys together with a shorter, more consistent delay
-        setTimeout(() => {
-            this.broadcast({
-                type: 'BATCH_VOTE_KEYS',
-                roundId: this.currentRound.id,
-                keys: allKeys,
-                from: this.nodeId
-            });
-        }, Math.random() * 1000 + 500); // Random delay 0.5-1.5 seconds (shorter and more consistent)
-    }
+		const roundKeys = this.voteKeys.get(this.currentRound.id);
+		
+		// Only share keys if we actually have any
+		if (!roundKeys || roundKeys.size === 0) {
+			console.log('📭 No keys to share for this round');
+			return;
+		}
+		
+		// Collect our keys to share
+		const keysToShare = [];
+		for (const [anonymousVoteId, keyData] of roundKeys) {
+			// Only share keys where we are the original submitter
+			if (keyData.submittedBy === this.nodeId) {
+				keysToShare.push({
+					anonymousVoteId: anonymousVoteId,
+					key: keyData.key
+				});
+			}
+		}
+		
+		if (keysToShare.length === 0) {
+			console.log('📭 No keys from our votes to share');
+			return;
+		}
+		
+		// Shuffle the keys to break any correlation with submission order
+		this.shuffleArray(keysToShare);
+		
+		console.log(`🔑 Preparing to share ${keysToShare.length} decryption keys`);
+		
+		// Broadcast keys with a random delay
+		setTimeout(() => {
+			this.broadcast({
+				type: 'BATCH_VOTE_KEYS',
+				roundId: this.currentRound.id,
+				keys: keysToShare,
+				from: this.nodeId
+			});
+			console.log(`📤 Shared ${keysToShare.length} decryption keys with network`);
+		}, Math.random() * 1000 + 500); // Random delay 0.5-1.5 seconds
+	}
 
     shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -1265,19 +1320,36 @@ class VotingNodeWithAutoGUI {
 
     // === VOTING ROUNDS ===
 
-    startVotingRound(topic, allowedChoices = null) {
+    startVotingRound(topic, allowedChoices = null, votingTimeSeconds = 100) {
         if (this.currentRound && this.currentRound.phase !== 'FINISHED') {
             console.log('A voting round is already active!');
             return;
         }
 
+        // Validate voting time: min 30 seconds, max 600 seconds (10 minutes), default 100 seconds
+        // Note: This is pure voting time - consensus phase gets additional fixed time
+        if (typeof votingTimeSeconds !== 'number' || votingTimeSeconds < 30 || votingTimeSeconds > 600) {
+            console.log(`⚠️ Invalid voting time: ${votingTimeSeconds}s. Using default 100 seconds.`);
+            console.log('   Valid range: 30-600 seconds (0.5-10 minutes) for voting phase only');
+            votingTimeSeconds = 100;
+        }
+
         const roundId = `round_${Date.now()}_${this.nodeId}`;
+        
+        // Separate voting and consensus phases
+        const votingPhaseMs = votingTimeSeconds * 1000;  // User-specified voting time
+        const consensusPhaseMs = 15000;  // Fixed 15 seconds for consensus
+        const totalRoundMs = votingPhaseMs + consensusPhaseMs;  // Total round duration
+        
         const round = {
             id: roundId,
             topic: topic,
             allowedChoices: allowedChoices,
             startTime: Date.now(),
-            duration: 5 * 60 * 1000,
+            duration: totalRoundMs,  // Total duration includes both phases
+            votingTimeSeconds: votingTimeSeconds,  // Store original voting time
+            votingPhaseMs: votingPhaseMs,  // Voting phase duration
+            consensusPhaseMs: consensusPhaseMs,  // Consensus phase duration
             phase: 'VOTING',
             votes: new Map(),
             results: null,
@@ -1301,6 +1373,7 @@ class VotingNodeWithAutoGUI {
             roundId: roundId,
             topic: topic,
             allowedChoices: allowedChoices,
+            votingTimeSeconds: votingTimeSeconds, // Include voting time in broadcast
             startTime: round.startTime,
             from: this.nodeId
         });
@@ -1311,68 +1384,79 @@ class VotingNodeWithAutoGUI {
             console.log(`Allowed choices: ${allowedChoices.join(', ')}`);
         }
         console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-        console.log(`Duration: 5 minutes`);
+        console.log(`⏰ Voting phase: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
+        console.log(`🔓 Consensus phase: ${consensusPhaseMs/1000} seconds (fixed)`);
+        console.log(`📊 Total round time: ${Math.round(totalRoundMs/1000)} seconds`);
         console.log(`Active nodes: ${this.getActiveNodeCount()}`);
         console.log(`Type 'vote <choice>' to cast your encrypted vote`);
         
-        // Schedule phase transitions
-        this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), 60 * 1000);
-        this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), 5 * 60 * 1000);
+        // Simple phase transitions: voting time → consensus phase → finish
+        this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), votingPhaseMs);
+        this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), totalRoundMs);
         
         return roundId;
     }
 	
-    handleRoundStart(message) {
-        console.log(`🔄 Handling ROUND_START from ${message.from}`);
-        console.log(`Current round: ${this.currentRound ? this.currentRound.id : 'none'}`);
-        console.log(`Incoming round: ${message.roundId}`);
-        
-        if (!this.currentRound || this.currentRound.startTime < message.startTime) {
-            console.log(`✅ Accepting new round from ${message.from}`);
-            
-            this.currentRound = {
-                id: message.roundId,
-                topic: message.topic,
-                allowedChoices: message.allowedChoices,
-                startTime: message.startTime,
-                duration: 5 * 60 * 1000,
-                phase: 'VOTING',
-                votes: new Map(),
-                results: null,
-                consensusAchieved: false,
-                consensusNodes: new Set(),
-                consensusTimeout: null,
-                finishTimeout: null
-            };
-            
-            this.votes.set(message.roundId, new Map());
-            this.encryptedVotes.set(message.roundId, new Map());
-            this.voteKeys.set(message.roundId, new Map());
-            this.resultProposed = false; // Initialize result proposal flag
-            this.keysSharingComplete = false; // Initialize keys sharing flag
-            this.hasVotedInRound.set(message.roundId, false); // Initialize voting status for this round
-            
-            console.log(`\n=== JOINED VOTING ROUND ===`);
-            console.log(`Topic: ${message.topic}`);
-            if (message.allowedChoices) {
-                console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
-            }
-            console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-            console.log(`Started by: ${message.from}`);
-            console.log(`Type 'vote <choice>' to cast your encrypted vote`);
-            
-            // Schedule phase transitions for this node too
-            const elapsed = Date.now() - message.startTime;
-            const consensusDelay = Math.max(100, (60 * 1000) - elapsed);
-            const finishDelay = Math.max(100, (5 * 60 * 1000) - elapsed);
-            
-            this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
-            this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
-            
-        } else {
-            console.log(`❌ Ignoring round start (older or same timestamp)`);
-        }
-    }
+	handleRoundStart(message) {
+		console.log(`🔄 Handling ROUND_START from ${message.from}`);
+		console.log(`Current round: ${this.currentRound ? this.currentRound.id : 'none'}`);
+		console.log(`Incoming round: ${message.roundId}`);
+		
+		if (!this.currentRound || this.currentRound.startTime < message.startTime) {
+			console.log(`✅ Accepting new round from ${message.from}`);
+			
+			const votingTimeSeconds = message.votingTimeSeconds || 100;
+			const votingPhaseMs = votingTimeSeconds * 1000;
+			const consensusPhaseMs = 15000; // Fixed 15 seconds for consensus
+			
+			this.currentRound = {
+				id: message.roundId,
+				topic: message.topic,
+				allowedChoices: message.allowedChoices,
+				startTime: message.startTime,
+				duration: votingPhaseMs + consensusPhaseMs,
+				votingTimeSeconds: votingTimeSeconds,
+				votingPhaseMs: votingPhaseMs,
+				consensusPhaseMs: consensusPhaseMs,
+				phase: 'VOTING',
+				votes: new Map(),
+				results: null,
+				consensusAchieved: false,
+				consensusNodes: new Set(),
+				consensusTimeout: null,
+				finishTimeout: null
+			};
+			
+			this.votes.set(message.roundId, new Map());
+			this.encryptedVotes.set(message.roundId, new Map());
+			this.voteKeys.set(message.roundId, new Map());
+			this.resultProposed = false;
+			this.keysSharingComplete = false;
+			this.hasVotedInRound.set(message.roundId, false);
+			
+			console.log(`\n=== JOINED VOTING ROUND ===`);
+			console.log(`Topic: ${message.topic}`);
+			if (message.allowedChoices) {
+				console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
+			}
+			console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
+			console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds`);
+			console.log(`Started by: ${message.from}`);
+			console.log(`Type 'vote <choice>' to cast your encrypted vote`);
+			
+			// Calculate when to enter consensus phase based on elapsed time
+			const elapsed = Date.now() - message.startTime;
+			const consensusDelay = Math.max(100, votingPhaseMs - elapsed);
+			const finishDelay = Math.max(100, (votingPhaseMs + consensusPhaseMs) - elapsed);
+			
+			console.log(`⏲️ Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
+			
+			this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
+			this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
+		} else {
+			console.log(`❌ Ignoring round start (older or same timestamp)`);
+		}
+	}
 
     checkIfReadyToPropose() {
         if (!this.currentRound || this.currentRound.phase !== 'CONSENSUS' || this.resultProposed) {
@@ -1384,7 +1468,7 @@ class VotingNodeWithAutoGUI {
         
         if (!encryptedVotes || !voteKeys) {
             console.log('⏳ Waiting for vote keys...');
-            setTimeout(() => this.checkIfReadyToPropose(), 3000);
+            setTimeout(() => this.checkIfReadyToPropose(), 2000);  // Fixed 2 seconds
             return;
         }
         
@@ -1417,8 +1501,8 @@ class VotingNodeWithAutoGUI {
             // Additional safety: wait a bit more to ensure all nodes are in the same state
             if (!this.keysSharingComplete) {
                 this.keysSharingComplete = true;
-                console.log('✅ All keys received - waiting 3 more seconds for synchronization...');
-                setTimeout(() => this.checkIfReadyToPropose(), 3000);
+                console.log(`✅ All keys received - waiting 2s for synchronization...`);
+                setTimeout(() => this.checkIfReadyToPropose(), 2000);  // Fixed 2 seconds
                 return;
             }
             
@@ -1426,8 +1510,8 @@ class VotingNodeWithAutoGUI {
             this.proposeResults();
         } else {
             console.log(`⏳ Still waiting: need keys for ${totalEncryptedVotes - totalKeys} votes OR key batches from ${activeNodes - uniqueKeyProviders.size} more nodes`);
-            // Check again in 3 seconds
-            setTimeout(() => this.checkIfReadyToPropose(), 3000);
+            // Check again in 2 seconds (fixed retry time for consensus phase)
+            setTimeout(() => this.checkIfReadyToPropose(), 2000);
         }
     }
 
@@ -1702,7 +1786,7 @@ class VotingNodeWithAutoGUI {
         return {
             topic: this.currentRound.topic,
             phase: this.currentRound.phase,
-            timeRemaining: Math.ceil(remaining / 1000),
+            timeRemaining: Math.floor(remaining / 1000), // Use Math.floor for smooth countdown
             encryptedVoteCount: encryptedVotes ? encryptedVotes.size : 0,
             decryptedVoteCount: decryptedVotes ? decryptedVotes.size : 0,
             activeNodes: this.getActiveNodeCount()
@@ -1757,16 +1841,37 @@ class VotingNodeWithAutoGUI {
                 
             case 'start':
                 if (args.length === 0) {
-                    console.log('Usage: start <topic> [choice1,choice2,choice3]');
+                    console.log('Usage: start <topic> [choice1,choice2,choice3] [time_in_seconds]');
+                    console.log('');
+                    console.log('Parameters:');
+                    console.log('  topic              : The voting topic/question');
+                    console.log('  choices (optional) : Comma-separated list of allowed choices');
+                    console.log('  time (optional)    : Voting duration in seconds (30-600, default: 100)');
+                    console.log('');
                     console.log('Examples:');
-                    console.log('  start "Should we deploy?" yes,no');
-                    console.log('  start "Pick a color" red,blue,green,yellow');
-                    console.log('  start "Free text question"  (no choices = any answer allowed)');
+                    console.log('  start "Should we deploy?" yes,no                     # 100 seconds (default)');
+                    console.log('  start "Should we deploy?" yes,no 60                 # 60 seconds');
+                    console.log('  start "Pick a color" red,blue,green,yellow 180      # 3 minutes');
+                    console.log('  start "Free text question" 120                      # 2 minutes, any answer');
+                    console.log('  start "Quick poll" yes,no 30                        # 30 seconds voting + 15s consensus');
+                    console.log('  start "Long discussion" agree,disagree,neutral 600  # 10 minutes (maximum)');
                     break;
                 }
                 
-                let topic, allowedChoices = null;
+                let topic, allowedChoices = null, votingTime = 100;
                 
+                // Parse arguments: topic [choices] [time]
+                // Look for numeric values that could be time
+                const lastArg = args[args.length - 1];
+                const secondLastArg = args.length > 1 ? args[args.length - 2] : null;
+                
+                // Check if last argument is a number (voting time)
+                if (/^\d+$/.test(lastArg)) {
+                    votingTime = parseInt(lastArg);
+                    args = args.slice(0, -1); // Remove time from args
+                }
+                
+                // Check if remaining last argument contains commas (choices)
                 if (args.length > 1 && args[args.length - 1].includes(',')) {
                     allowedChoices = args.pop().split(',').map(choice => choice.trim());
                     topic = args.join(' ');
@@ -1774,7 +1879,7 @@ class VotingNodeWithAutoGUI {
                     topic = args.join(' ');
                 }
                 
-                this.startVotingRound(topic, allowedChoices);
+                this.startVotingRound(topic, allowedChoices, votingTime);
                 break;
                 
             case 'vote':
