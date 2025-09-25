@@ -1,0 +1,27 @@
+# Docker Compose configuration for P2P Voting System
+version: '3.8'
+
+services:
+  # Manager service runs on host network to be accessible from Windows browser
+  manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.manager
+    ports:
+      - "8080:8080"  # Manager web interface
+    volumes:
+      - ./:/app
+      - /var/run/docker.sock:/var/run/docker.sock  # Allow manager to create containers
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - NODE_ENV=production
+    networks:
+      - voting-network
+    command: node manager-docker.js
+
+networks:
+  voting-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

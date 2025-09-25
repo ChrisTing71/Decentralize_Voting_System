@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P 投票節點控制台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; min-height: 100vh; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; }
+        .panel { background: #fff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { color: #333; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .peer-item { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+        .peer-item input { flex-grow: 1; }
+        .btn { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.3s; width: 100%; }
+        .btn:hover { background: #0056b3; }
+        .btn.secondary { background: #6c757d; }
+        .btn.secondary:hover { background: #5a6268; }
+        .btn.danger { background: #dc3545; }
+        .btn.danger:hover { background: #c82333; }
+        #runningNodes h2 { margin-bottom: 15px; }
+        .node-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        .node-list-item:last-child { border-bottom: none; }
+        .node-info span { background: #e9ecef; padding: 4px 8px; border-radius: 4px; font-family: monospace; }
+        .status-message { padding: 10px; border-radius: 8px; margin-top: 15px; text-align: center; }
+        .status-message.success { background-color: #d4edda; color: #155724; }
+        .status-message.error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel" id="controlPanel">
+            <div class="header">
+                <h1>啟動新節點</h1>
+            </div>
+            <form id="nodeForm">
+                <div class="form-group">
+                    <label for="nodeName">節點名稱</label>
+                    <input type="text" id="nodeName" placeholder="例如: NodeA" required>
+                </div>
+                <div class="form-group">
+                    <label for="port">埠號 (Port)</label>
+                    <input type="number" id="port" value="3777" required>
+                </div>
+                <div class="form-group">
+                    <label>對等節點 (Peers)</label>
+                    <div id="peersContainer"></div>
+                    <button type="button" class="btn secondary" onclick="addPeerInput()" style="width: auto; padding: 8px 15px; font-size: 14px;">+ 新增 Peer</button>
+                </div>
+                <button type="button" class="btn" onclick="launchNode()">🚀 啟動節點並跳轉</button>
+                <div id="statusMessage" class="status-message" style="display: none;"></div>
+            </form>
+        </div>
+
+        <div class="panel" id="runningNodes">
+            <div class="header">
+                <h1>運行中的節點</h1>
+            </div>
+            <div id="nodeList">
+                <p>正在從後端獲取列表...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MANAGER_API_URL = 'http://localhost:8080'; // 後端管理器的位置
+
+        async function launchNode() {
+            const nodeNameInput = document.getElementById('nodeName');
+            const portInput = document.getElementById('port');
+
+            const nodeName = nodeNameInput.value.trim();
+            const port = portInput.value.trim();
+            const peers = Array.from(document.querySelectorAll('.peer-address'))
+                               .map(input => input.value.trim())
+                               .filter(value => value);
+
+            if (!nodeName || !port) {
+                showStatus('節點名稱和埠號為必填項！', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${MANAGER_API_URL}/api/launch-node`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nodeName, port, peers })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // **修改點 2: 直接跳轉到 GUI 頁面，而不是開新視窗**
+                    const guiUrl = `voting-gui.html?nodeId=${nodeName}&host=localhost&port=${port}&t=${Date.now()}`;
+                    showStatus('節點啟動成功！正在跳轉...', 'success');
+                    
+                    // 延遲一小段時間讓使用者看到成功訊息，然後跳轉
+                    setTimeout(() => {
+                        window.location.href = guiUrl; 
+                    }, 1000);
+
+                } else {
+                    showStatus(result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error launching node:', error);
+                showStatus('無法連接到後端管理器。請確認 manager.js 正在運行。', 'error');
+            }
+        }
+
+        async function stopNode(nodeName) {
+            if (!confirm(`確定要關閉節點 ${nodeName} 嗎？`)) return;
+
+            try {
+                const response = await fetch(`${MANAGER_API_URL}/api/stop-node`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nodeName })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showStatus(result.message, 'success');
+                    fetchRunningNodes();
+                } else {
+                    showStatus(result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error stopping node:', error);
+                showStatus('無法連接到後端管理器。', 'error');
+            }
+        }
+
+        async function fetchRunningNodes() {
+            const listContainer = document.getElementById('nodeList');
+            const portInput = document.getElementById('port');
+            const defaultPort = 3777;
+
+            try {
+                const response = await fetch(`${MANAGER_API_URL}/api/nodes`);
+                const nodes = await response.json();
+
+                if (nodes.length === 0) {
+                    listContainer.innerHTML = '<p>目前沒有正在運行的節點。</p>';
+                    portInput.value = defaultPort;
+                    return;
+                }
+
+                listContainer.innerHTML = '';
+                let maxPort = 0;
+                nodes.forEach(node => {
+                    const item = document.createElement('div');
+                    item.className = 'node-list-item';
+                    item.innerHTML = `
+                        <div class="node-info">
+                            <strong>${node.name}</strong> on port <span>${node.port}</span>
+                        </div>
+                        <button class="btn danger" onclick="stopNode('${node.name}')" style="width: auto; padding: 8px 15px; font-size: 14px;">關閉</button>
+                    `;
+                    listContainer.appendChild(item);
+                    if (node.port > maxPort) {
+                        maxPort = node.port;
+                    }
+                });
+
+                portInput.value = maxPort > 0 ? maxPort + 1 : defaultPort;
+
+            } catch (error) {
+                console.error('Error fetching nodes:', error);
+                listContainer.innerHTML = '<p style="color: red;">無法連接到後端管理器以獲取節點列表。</p>';
+            }
+        }
+
+        // --- UI 輔助函式 ---
+        function addPeerInput() {
+            const container = document.getElementById('peersContainer');
+            const peerItem = document.createElement('div');
+            peerItem.className = 'peer-item';
+            peerItem.innerHTML = `<input type="text" class="peer-address" placeholder="例如: localhost:3002"><button type="button" onclick="this.parentElement.remove()" style="border:none; background:transparent; cursor:pointer; font-size:1.2em;">&times;</button>`;
+            container.appendChild(item);
+        }
+
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = `status-message ${type}`;
+            statusElement.style.display = 'block';
+        }
+
+        window.addEventListener('load', () => {
+            addPeerInput();
+            fetchRunningNodes();
+        });
+    </script>
+</body>
+</html>

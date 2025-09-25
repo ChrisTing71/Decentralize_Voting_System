@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>P2P Voting System</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 30px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                backdrop-filter: blur(10px);
+            }
+
+            .header {
+                text-align: center;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #e0e0e0;
+                padding-bottom: 20px;
+            }
+
+            .header h1 {
+                color: #333;
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+
+            .header p {
+                color: #666;
+                font-size: 1.1em;
+            }
+
+            /* Connection Status Bar */
+            .connection-bar {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .connection-info {
+                display: flex;
+                align-items: center;
+                gap: 20px;
+            }
+
+            .connection-status {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .status-indicator {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: #dc3545;
+            }
+
+            .status-indicator.connected {
+                background: #28a745;
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+                70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+            }
+
+            .node-badge {
+                background: rgba(255, 255, 255, 0.2);
+                padding: 5px 15px;
+                border-radius: 20px;
+                font-weight: bold;
+            }
+
+            .status-bar {
+                background: linear-gradient(90deg, #4CAF50, #45a049);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+
+            .status-item {
+                text-align: center;
+                min-width: 100px;
+                position: relative;
+            }
+
+            .status-label {
+                font-size: 0.9em;
+                opacity: 0.9;
+            }
+
+            .status-value {
+                font-size: 1.2em;
+                font-weight: bold;
+            }
+
+            /* Enhanced timer styling */
+            .timer-container {
+                position: relative;
+            }
+
+            .timer-value {
+                transition: color 0.3s ease;
+            }
+
+            .timer-value.warning {
+                color: #ff6b35 !important;
+                animation: pulse-warning 1s infinite;
+            }
+
+            .timer-value.critical {
+                color: #ff1744 !important;
+                animation: pulse-critical 0.5s infinite;
+            }
+
+            .timer-progress {
+                position: absolute;
+                bottom: -2px;
+                left: 0;
+                height: 3px;
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 1.5px;
+                transition: width 1s linear;
+            }
+
+            @keyframes pulse-warning {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+
+            @keyframes pulse-critical {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 20px;
+            }
+
+            .panel {
+                background: #f8f9fa;
+                border-radius: 15px;
+                padding: 20px;
+                border: 1px solid #e0e0e0;
+            }
+
+            .panel h3 {
+                color: #333;
+                margin-bottom: 15px;
+                font-size: 1.3em;
+                display: flex;
+                align-items: center;
+            }
+
+            .panel h3::before {
+                content: "🗳️";
+                margin-right: 10px;
+                font-size: 1.2em;
+            }
+
+            .panel.peers h3::before {
+                content: "🌐";
+            }
+
+            .panel.results h3::before {
+                content: "📊";
+            }
+
+            .panel.verification h3::before {
+                content: "🔍";
+            }
+
+            .form-group {
+                margin-bottom: 15px;
+            }
+
+            .form-group label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: 600;
+                color: #333;
+            }
+
+            .form-group input, .form-group textarea {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                font-size: 16px;
+                transition: border-color 0.3s ease;
+            }
+
+            .form-group input:focus, .form-group textarea:focus {
+                outline: none;
+                border-color: #667eea;
+                box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            }
+
+            .btn {
+                background: linear-gradient(45deg, #667eea, #764ba2);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin-right: 10px;
+                margin-bottom: 10px;
+            }
+
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            }
+
+            .btn:active {
+                transform: translateY(0);
+            }
+
+            .btn.secondary {
+                background: linear-gradient(45deg, #6c757d, #5a6268);
+            }
+
+            .btn.success {
+                background: linear-gradient(45deg, #28a745, #218838);
+            }
+
+            .choice-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-bottom: 15px;
+            }
+
+            .choice-btn {
+                background: #fff;
+                border: 2px solid #667eea;
+                color: #667eea;
+                padding: 10px 20px;
+                border-radius: 25px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+
+            .choice-btn:hover {
+                background: #667eea;
+                color: white;
+            }
+
+            .choice-btn.selected {
+                background: #667eea;
+                color: white;
+            }
+
+            .peer-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .peer-item {
+                background: #4CAF50;
+                color: white;
+                padding: 8px 15px;
+                border-radius: 20px;
+                font-size: 0.9em;
+            }
+
+            .log-container {
+                background: #000;
+                color: #00ff00;
+                border-radius: 10px;
+                padding: 15px;
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                height: 200px;
+                overflow-y: auto;
+                margin-top: 20px;
+            }
+
+            .anonymity-notice {
+                background: linear-gradient(45deg, #667eea, #764ba2);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+
+            .error-message {
+                background: #dc3545;
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+
+            .loading {
+                text-align: center;
+                padding: 40px;
+                color: #666;
+            }
+
+            .loading::after {
+                content: '...';
+                animation: dots 1.5s steps(4, end) infinite;
+            }
+            
+            .debug-panel {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 10px;
+                padding: 15px;
+                margin-bottom: 20px;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+            }
+            .debug-panel h4 {
+                margin-top: 0;
+                color: #495057;
+            }
+            .debug-info {
+                color: #6c757d;
+            }
+            .connection-validation {
+                background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+            .connection-validation.success {
+                background: linear-gradient(45deg, #51cf66, #40c057);
+            }
+            .parameter-display {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 10px;
+                margin: 10px 0;
+                font-family: monospace;
+                font-size: 12px;
+            }
+
+            @keyframes dots {
+                0%, 20% { content: ''; }
+                40% { content: '.'; }
+                60% { content: '..'; }
+                80%, 100% { content: '...'; }
+            }
+
+            @media (max-width: 768px) {
+                .grid {
+                    grid-template-columns: 1fr;
+                }
+                
+                .status-bar {
+                    flex-direction: column;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🔒 P2P Anonymous Voting System</h1>
+                <p>Decentralized • Encrypted • Anonymous • Verifiable</p>
+            </div>
+            <!-- Connection Validation Panel -->
+            <div class="connection-validation" id="connectionValidation">
+                <div id="validationMessage">🔍 Validating connection parameters...</div>
+                <div class="parameter-display" id="parameterDisplay"></div>
+            </div>
+
+            <!-- Connection Status Bar -->
+            <div class="connection-bar">
+                <div class="connection-info">
+                    <div class="connection-status">
+                        <div class="status-indicator" id="connectionIndicator"></div>
+                        <span id="connectionStatusText">Connecting...</span>
+                    </div>
+                    <div class="node-badge" id="nodeBadge">Node: -</div>
+                    <div class="node-badge" id="portBadge">Port: -</div>
+                </div>
+                <button class="btn secondary" onclick="reconnect()" id="reconnectBtn" style="display: none;">Reconnect</button>
+            </div>
+
+            <!-- Error Message (hidden by default) -->
+            <div class="error-message" id="errorMessage" style="display: none;">
+                ⚠️ Connection failed. Make sure the node is running and try refreshing the page.
+            </div>
+
+            <!-- Main Interface -->
+            <div id="mainInterface">
+                <div class="anonymity-notice">
+                    <strong>🛡️ Your privacy is protected:</strong> Votes are encrypted during voting, identities remain anonymous, and only you can verify your own vote was counted.
+                </div>
+
+                <div class="status-bar">
+                    <div class="status-item">
+                        <div class="status-label">Connected Peers</div>
+                        <div class="status-value" id="peerCount">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Current Round</div>
+                        <div class="status-value" id="currentRound">None</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Phase</div>
+                        <div class="status-value" id="currentPhase">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Time Remaining</div>
+                        <div class="status-value timer-container">
+                            <span class="timer-value" id="timeRemaining">-</span>
+                            <div class="timer-progress" id="timerProgress"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="panel">
+                        <h3>Start New Vote</h3>
+                        <div class="form-group">
+                            <label for="voteTopicInput">Topic</label>
+                            <textarea id="voteTopicInput" rows="3" placeholder="Enter your voting topic..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="votingTimeInput">Voting Duration (30-600 seconds)</label>
+                            <input type="number" id="votingTimeInput" min="30" max="600" value="100" placeholder="100">
+                            <small style="color: #666; font-size: 0.9em;">Default: 100 seconds, Min: 30 seconds, Max: 600 seconds (+ 15s consensus)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="choicesInput">Allowed Choices (optional)</label>
+                            <input type="text" id="choicesInput" placeholder="e.g., yes,no,abstain or red,blue,green">
+                            <small style="color: #666; font-size: 0.9em;">Leave empty for free-text voting</small>
+                        </div>
+                        <button class="btn" onclick="startVote()">🗳️ Start Voting Round</button>
+                    </div>
+
+                    <div class="panel">
+                        <h3>Cast Your Vote</h3>
+                        <div id="votingInterface">
+                            <p style="color: #666;">No active voting round</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid">
+                    <div class="panel peers">
+                        <h3>Network Peers</h3>
+                        <div id="peersList" class="peer-list">
+                            <div style="color: #666;">Connecting to peers...</div>
+                        </div>
+                        <button class="btn secondary" onclick="refreshStatus()">🔄 Refresh Status</button>
+                    </div>
+
+                    <div class="panel results">
+                        <h3>Current Results</h3>
+                        <div id="resultsDisplay">
+                            <div style="color: #666;">No results to display</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="log-container" id="logContainer">
+                <div>📡 Initializing connection...</div>
+            </div>
+        </div>
+
+        <script>
+            // WebSocket connection
+            let ws = null;
+            let isConnected = false;
+            let currentNodeId = '';
+            let currentPort = '';
+            let currentHost = '';
+            let currentRoundData = null;
+            let hasVoted = false;
+            let selectedChoice = null;
+            let reconnectAttempts = 0;
+            let maxReconnectAttempts = 5;
+            
+            // Timer-related variables
+            let timerInterval = null;
+            let roundStartTime = null;
+            let roundDuration = null;
+            let lastServerTime = null;
+            let lastDisplayedTime = null; // Track last displayed time to detect jumps
+
+            // ENHANCED: Clear any existing localStorage/sessionStorage that might interfere
+            function clearBrowserStorage() {
+                try {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    console.log('🧹 Cleared browser storage');
+                } catch (e) {
+                    console.log('⚠️ Could not clear browser storage:', e.message);
+                }
+            }
+
+            // ENHANCED: Get and validate connection parameters from URL
+            function getConnectionParameters() {
+                // Clear storage first to prevent old connections
+                clearBrowserStorage();
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const params = {
+                    nodeId: urlParams.get('nodeId') || 'unknown',
+                    host: urlParams.get('host') || 'localhost',
+                    port: urlParams.get('port') || '3001',
+                    timestamp: urlParams.get('t') || 'none',
+                    randomId: urlParams.get('r') || 'none'
+                };
+                
+                // Display parameters for validation
+                const paramDisplay = document.getElementById('parameterDisplay');
+                paramDisplay.innerHTML = `
+                    <strong>URL Parameters:</strong><br>
+                    nodeId: ${params.nodeId}<br>
+                    host: ${params.host}<br>
+                    port: ${params.port}<br>
+                    timestamp: ${params.timestamp}<br>
+                    randomId: ${params.randomId}<br>
+                    full URL: ${window.location.href}
+                `;
+                
+                // Validate that we have the expected parameters
+                const validation = document.getElementById('connectionValidation');
+                const validationMsg = document.getElementById('validationMessage');
+                
+                if (params.nodeId === 'unknown' || params.port === '3001' && params.timestamp === 'none') {
+                    validation.classList.remove('success');
+                    validationMsg.innerHTML = '⚠️ WARNING: Using default parameters. This might connect to the wrong node!';
+                } else {
+                    validation.classList.add('success');
+                    validationMsg.innerHTML = `✅ Connection parameters validated for ${params.nodeId} → port ${params.port}`;
+                }
+                
+                return params;
+            }
+
+            // Initialize connection on page load
+            window.addEventListener('load', () => {
+                // Get fresh parameters from URL
+                const params = getConnectionParameters();
+                currentNodeId = params.nodeId;
+                currentHost = params.host;
+                currentPort = params.port;
+                
+                // Update UI with node info
+                document.getElementById('nodeBadge').textContent = `Node: ${currentNodeId}`;
+                document.getElementById('portBadge').textContent = `Port: ${currentPort}`;
+                
+                // Update page title to make it clear which node this is
+                document.title = `P2P Voting - ${currentNodeId} (Port ${currentPort})`;
+                
+                // Auto-connect with delay to show validation
+                setTimeout(() => {
+                    connectToNode();
+                }, 2000);
+            });
+
+            function connectToNode() {
+                const wsUrl = `ws://${currentHost}:${currentPort}`;
+                
+                addLog(`🔌 Connecting to ${wsUrl} for node ${currentNodeId}...`);
+                document.getElementById('connectionStatusText').textContent = 'Connecting...';
+                
+                try {
+                    ws = new WebSocket(wsUrl);
+                    
+                    ws.onopen = () => {
+                        isConnected = true;
+                        reconnectAttempts = 0;
+                        updateConnectionStatus(true);
+                        addLog(`✅ Connected to node ${currentNodeId} at port ${currentPort}`);
+                        
+                        // Update validation panel to show successful connection
+                        const validation = document.getElementById('connectionValidation');
+                        const validationMsg = document.getElementById('validationMessage');
+                        validation.classList.add('success');
+                        validationMsg.innerHTML = `🎉 Successfully connected to ${currentNodeId} on port ${currentPort}`;
+                        
+                        // Send handshake
+                        ws.send(JSON.stringify({
+                            type: 'HANDSHAKE',
+                            from: `gui-${currentNodeId}`,
+                            isGUI: true
+                        }));
+                        
+                        // Request initial status
+                        setTimeout(() => sendCommand('status'), 500);
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        handleMessage(JSON.parse(event.data));
+                    };
+                    
+                    ws.onerror = (error) => {
+                        addLog(`❌ Connection error: Check if node ${currentNodeId} is running on port ${currentPort}`);
+                        updateConnectionStatus(false);
+                        
+                        // Update validation panel to show error
+                        const validation = document.getElementById('connectionValidation');
+                        const validationMsg = document.getElementById('validationMessage');
+                        validation.classList.remove('success');
+                        validationMsg.innerHTML = `❌ Failed to connect to ${currentNodeId} on port ${currentPort}`;
+                    };
+                    
+                    ws.onclose = () => {
+                        isConnected = false;
+                        updateConnectionStatus(false);
+                        addLog('❌ Disconnected from node');
+                        
+                        // Auto-reconnect with exponential backoff
+                        if (reconnectAttempts < maxReconnectAttempts) {
+                            reconnectAttempts++;
+                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+                            addLog(`🔄 Reconnecting in ${delay/1000} seconds... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+                            setTimeout(connectToNode, delay);
+                        } else {
+                            addLog('❌ Max reconnection attempts reached. Click Reconnect to try again.');
+                            document.getElementById('errorMessage').style.display = 'block';
+                        }
+                    };
+                    
+                } catch (error) {
+                    addLog(`❌ Failed to create WebSocket: ${error.message}`);
+                    updateConnectionStatus(false);
+                }
+            }
+
+            function reconnect() {
+                reconnectAttempts = 0;
+                document.getElementById('errorMessage').style.display = 'none';
+                
+                // Re-parse URL parameters in case they changed
+                const params = getConnectionParameters();
+                currentNodeId = params.nodeId;
+                currentHost = params.host;
+                currentPort = params.port;
+                
+                connectToNode();
+            }
+
+            function updateConnectionStatus(connected) {
+                const indicator = document.getElementById('connectionIndicator');
+                const statusText = document.getElementById('connectionStatusText');
+                const reconnectBtn = document.getElementById('reconnectBtn');
+                
+                if (connected) {
+                    indicator.classList.add('connected');
+                    statusText.textContent = 'Connected';
+                    reconnectBtn.style.display = 'none';
+                    document.getElementById('errorMessage').style.display = 'none';
+                } else {
+                    indicator.classList.remove('connected');
+                    statusText.textContent = 'Disconnected';
+                    reconnectBtn.style.display = 'inline-block';
+                }
+            }
+
+            function handleMessage(message) {
+                // Don't log heartbeats
+                if (message.type !== 'HEARTBEAT') {
+                    addLog(`📨 Received: ${message.type}`);
+                }
+                
+                switch (message.type) {
+                    case 'STATUS_UPDATE':
+                        updateStatus(message.data);
+                        break;
+                    case 'ROUND_START':
+                        handleRoundStart(message);
+                        break;
+                    case 'PHASE_CHANGE':
+                        handlePhaseChange(message);
+                        break;
+                    case 'RESULTS':
+                        handleResults(message);
+                        break;
+                    case 'COMMAND_RESPONSE':
+                        handleCommandResponse(message);
+                        break;
+                }
+            }
+
+            function sendCommand(command, args = []) {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    addLog('❌ Not connected to node');
+                    return;
+                }
+                
+                const message = {
+                    type: 'COMMAND',
+                    command: command,
+                    args: args,
+                    from: `gui-${currentNodeId}`
+                };
+                
+                ws.send(JSON.stringify(message));
+            }
+
+            function startVote() {
+                const topic = document.getElementById('voteTopicInput').value.trim();
+                const choices = document.getElementById('choicesInput').value.trim();
+                const votingTime = document.getElementById('votingTimeInput').value;
+                
+                if (!topic) {
+                    alert('Please enter a voting topic');
+                    return;
+                }
+                
+                // Validate voting time
+                const time = parseInt(votingTime);
+                if (votingTime && (isNaN(time) || time < 30 || time > 600)) {
+                    alert('Voting time must be between 30 and 600 seconds');
+                    return;
+                }
+                
+                const args = [topic];
+                if (choices) {
+                    args.push(choices);
+                }
+                if (votingTime && votingTime !== '100') {
+                    // Add voting time as the last argument if it's not the default
+                    args.push(votingTime);
+                }
+                
+                sendCommand('start', args);
+                
+                // Clear form
+                document.getElementById('voteTopicInput').value = '';
+                document.getElementById('choicesInput').value = '';
+                document.getElementById('votingTimeInput').value = '100';
+            }
+
+            function castVote() {
+                if (!selectedChoice) {
+                    alert('Please select a choice first');
+                    return;
+                }
+                
+                sendCommand('vote', [selectedChoice]);
+                hasVoted = true;
+                updateVotingInterface();
+            }
+
+            function castFreeTextVote() {
+                const choice = document.getElementById('freeTextVote').value.trim();
+                
+                if (!choice) {
+                    alert('Please enter your vote');
+                    return;
+                }
+                
+                sendCommand('vote', [choice]);
+                hasVoted = true;
+                updateVotingInterface();
+            }
+
+            function selectChoice(choice) {
+                selectedChoice = choice;
+                
+                // Update visual selection
+                document.querySelectorAll('.choice-btn').forEach(btn => {
+                    btn.classList.remove('selected');
+                    if (btn.textContent === choice) {
+                        btn.classList.add('selected');
+                    }
+                });
+                
+                // Enable vote button
+                const voteBtn = document.getElementById('voteButton');
+                if (voteBtn) {
+                    voteBtn.disabled = false;
+                }
+            }
+
+            function updateVotingInterface() {
+                const container = document.getElementById('votingInterface');
+                
+                if (!currentRoundData || currentRoundData.phase !== 'VOTING') {
+                    container.innerHTML = '<p style="color: #666;">No active voting round</p>';
+                    return;
+                }
+
+                if (hasVoted) {
+                    container.innerHTML = `
+                        <p style="color: #28a745;">✅ You have already voted in this round</p>
+                        <p style="font-size: 0.9em; color: #666;">Your vote is encrypted and anonymous</p>
+                    `;
+                    return;
+                }
+
+                const choices = currentRoundData.allowedChoices;
+                
+                if (choices && choices.length > 0) {
+                    container.innerHTML = `
+                        <p><strong>Topic:</strong> ${currentRoundData.topic}</p>
+                        <div class="choice-container">
+                            ${choices.map(choice => 
+                                `<div class="choice-btn" onclick="selectChoice('${choice}')">${choice}</div>`
+                            ).join('')}
+                        </div>
+                        <button class="btn success" onclick="castVote()" id="voteButton" disabled>Cast Vote</button>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <p><strong>Topic:</strong> ${currentRoundData.topic}</p>
+                        <div class="form-group">
+                            <input type="text" id="freeTextVote" placeholder="Enter your choice...">
+                        </div>
+                        <button class="btn success" onclick="castFreeTextVote()">Cast Vote</button>
+                    `;
+                }
+            }
+
+            function updateStatus(status) {
+                document.getElementById('peerCount').textContent = status.peers || 0;
+                document.getElementById('currentRound').textContent = status.roundTopic ? 
+                    (status.roundTopic.length > 30 ? status.roundTopic.substring(0, 30) + '...' : status.roundTopic) : 'None';
+                document.getElementById('currentPhase').textContent = status.phase || '-';
+                
+                // Check if voting round is actually active (not finished/waiting)
+                const isActiveVotingPhase = status.phase && 
+                    (status.phase === 'VOTING' || status.phase === 'CONSENSUS' || status.phase === 'COLLECTING');
+                
+                // Minimal timer handling to prevent interference
+                if (status.timeRemaining !== undefined && status.timeRemaining > 0 && isActiveVotingPhase) {
+                    lastServerTime = status.timeRemaining;
+                    // ONLY sync if we don't have a timer running at all
+                    if (!timerInterval) {
+                        addLog(`⏰ Starting timer for active phase ${status.phase}: ${status.timeRemaining}s`);
+                        syncTimerWithServer(status.timeRemaining);
+                    }
+                    // CRITICAL: If we have a timer running, DO NOT SYNC AT ALL during voting
+                    // This completely prevents any 2-second jumps during countdown
+                } else if (status.timeRemaining !== undefined && status.timeRemaining <= 0) {
+                    // Server says time is up - but ONLY stop if we also think time should be up
+                    // Don't sync here to prevent premature stops
+                    if (!timerInterval) {
+                        // No timer running anyway, safe to update display
+                        const timerElement = document.getElementById('timeRemaining');
+                        const progressElement = document.getElementById('timerProgress');
+                        timerElement.textContent = '0s';
+                        timerElement.className = 'timer-value critical';
+                        if (progressElement) progressElement.style.width = '100%';
+                    }
+                    // If timer IS running, let it finish naturally - don't force stop
+                } else if (!isActiveVotingPhase) {
+                    // Phase is not active voting (FINISHED, WAITING, etc.) - stop timer
+                    if (timerInterval) {
+                        addLog(`⏹️ Stopping timer: phase changed to ${status.phase}`);
+                        stopTimer();
+                    }
+                    const timerElement = document.getElementById('timeRemaining');
+                    const progressElement = document.getElementById('timerProgress');
+                    timerElement.textContent = '-';
+                    timerElement.className = 'timer-value';
+                    if (progressElement) progressElement.style.width = '0%';
+                } else {
+                    // No active round
+                    if (timerInterval) {
+                        stopTimer();
+                    }
+                    const timerElement = document.getElementById('timeRemaining');
+                    const progressElement = document.getElementById('timerProgress');
+                    timerElement.textContent = '-';
+                    timerElement.className = 'timer-value';
+                    if (progressElement) progressElement.style.width = '0%';
+                }
+                
+                // Update peers list
+                if (status.peersList && status.peersList.length > 0) {
+                    const container = document.getElementById('peersList');
+                    container.innerHTML = status.peersList.map(peer => 
+                        `<div class="peer-item">${peer}</div>`
+                    ).join('');
+                } else {
+                    document.getElementById('peersList').innerHTML = '<div style="color: #666;">No peers connected</div>';
+                }
+            }
+            
+            // Timer management functions
+            function startTimer(durationSeconds) {
+                // Stop any existing timer
+                stopTimer();
+                
+                roundStartTime = Date.now();
+                roundDuration = durationSeconds * 1000; // Convert to milliseconds
+                
+                // Start 1-second interval timer
+                timerInterval = setInterval(updateTimerDisplay, 1000);
+                
+                // Update immediately
+                updateTimerDisplay();
+                
+                addLog(`⏰ Timer started: ${durationSeconds} seconds (client-side)`);
+            }
+            
+            function stopTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    addLog(`⏹️ Client timer stopped`);
+                }
+                roundStartTime = null;
+                roundDuration = null;
+                lastServerTime = null;
+                lastDisplayedTime = null;
+            }
+            
+            function updateTimerDisplay() {
+                const timerElement = document.getElementById('timeRemaining');
+                const progressElement = document.getElementById('timerProgress');
+                
+                if (!roundStartTime || !roundDuration || !timerElement) {
+                    if (timerElement) {
+                        timerElement.textContent = '-';
+                        timerElement.className = 'timer-value';
+                    }
+                    if (progressElement) progressElement.style.width = '0%';
+                    return;
+                }
+                
+                const elapsed = Date.now() - roundStartTime;
+                const remaining = Math.max(0, Math.floor((roundDuration - elapsed) / 1000));
+                
+                // Debug: Detect jumps in timer display
+                if (lastDisplayedTime !== null && lastDisplayedTime !== remaining) {
+                    const timeDiff = lastDisplayedTime - remaining;
+                    if (timeDiff > 1) {
+                        addLog(`⚠️ Timer jump detected: ${lastDisplayedTime}s → ${remaining}s (jump of ${timeDiff}s)`);
+                    }
+                }
+                lastDisplayedTime = remaining;
+                
+                // Update the display
+                timerElement.textContent = `${remaining}s`;
+                
+                // Calculate progress percentage
+                const progress = Math.max(0, Math.min(100, (elapsed / roundDuration) * 100));
+                if (progressElement) {
+                    progressElement.style.width = `${progress}%`;
+                }
+                
+                // Apply warning colors based on remaining time
+                timerElement.className = 'timer-value';
+                if (remaining <= 10 && remaining > 5) {
+                    timerElement.classList.add('warning');
+                } else if (remaining <= 5) {
+                    timerElement.classList.add('critical');
+                }
+                
+                // Stop timer when it reaches 0
+                if (remaining <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    timerElement.textContent = '0s';
+                    timerElement.className = 'timer-value critical';
+                    if (progressElement) progressElement.style.width = '100%';
+                    addLog('⏰ Client timer reached zero');
+                    
+                    // Clean up timer variables but don't reset to null yet 
+                    // in case server updates are still coming
+                    setTimeout(() => {
+                        if (!timerInterval) { // Only reset if timer is still stopped
+                            roundStartTime = null;
+                            roundDuration = null;
+                            lastDisplayedTime = null;
+                        }
+                    }, 2000);
+                }
+            }
+            
+            function syncTimerWithServer(serverTimeRemaining) {
+                // ULTRA-STRICT: Only handle the most basic edge cases
+                
+                if (serverTimeRemaining > 0 && !timerInterval) {
+                    // Case 1: No timer running but server says there should be one
+                    addLog(`⏰ Starting timer from server sync: ${serverTimeRemaining}s`);
+                    startTimer(serverTimeRemaining);
+                    return;
+                }
+                
+                // Case 2: Removed the forceful stop when server says time is up
+                // Let client timer finish naturally to prevent interruptions
+                
+                // ALL OTHER CASES: Do absolutely nothing
+                // This ensures the client timer runs completely independently
+            }
+
+            function handleRoundStart(message) {
+                currentRoundData = {
+                    id: message.roundId,
+                    topic: message.topic,
+                    allowedChoices: message.allowedChoices,
+                    phase: 'VOTING'
+                };
+                hasVoted = false;
+                selectedChoice = null;
+                
+                // Initialize client-side timer - always start fresh timer for new rounds
+                if (message.votingTimeSeconds) {
+                    addLog(`🗳️ Voting round started: ${message.topic} (${message.votingTimeSeconds}s)`);
+                    startTimer(message.votingTimeSeconds);
+                } else {
+                    addLog(`🗳️ Voting round started: ${message.topic}`);
+                }
+                
+                updateVotingInterface();
+            }
+
+            function handlePhaseChange(message) {
+                if (currentRoundData) {
+                    currentRoundData.phase = message.phase;
+                }
+                
+                // Stop timer if round finished
+                if (message.phase === 'FINISHED' || message.phase === 'CONSENSUS') {
+                    if (message.phase === 'FINISHED') {
+                        stopTimer();
+                    }
+                }
+                
+                addLog(`🔄 Phase changed to: ${message.phase}`);
+                updateVotingInterface();
+            }
+
+            function handleResults(message) {
+                const container = document.getElementById('resultsDisplay');
+                if (message.results && message.results.length > 0) {
+                    container.innerHTML = `
+                        <div style="background: #fff; border-radius: 10px; padding: 15px;">
+                            ${message.results.map(result => `
+                                <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee;">
+                                    <span style="font-weight: 600;">${result.choice}</span>
+                                    <span style="background: #667eea; color: white; padding: 4px 12px; border-radius: 15px;">${result.count}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '<div style="color: #666;">No results to display</div>';
+                }
+                addLog('📊 Results received');
+            }
+
+            function handleCommandResponse(message) {
+                if (message.response) {
+                    addLog(`📋 ${message.response}`);
+                }
+            }
+
+            function refreshStatus() {
+                sendCommand('status');
+            }
+
+            function addLog(message) {
+                const container = document.getElementById('logContainer');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `[${timestamp}] ${message}`;
+                container.appendChild(logEntry);
+                container.scrollTop = container.scrollHeight;
+                
+                // Keep only last 100 log entries
+                while (container.children.length > 100) {
+                    container.removeChild(container.firstChild);
+                }
+            }
+        </script>
+    </body>
+</html>

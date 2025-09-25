@@ -1,0 +1,20 @@
+# Dockerfile for Manager Service
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install required packages including Docker CLI
+RUN apk add --no-cache docker-cli
+
+# Copy package files
+COPY package*.json ./
+RUN npm install
+
+# Copy application files
+COPY . .
+
+# Expose manager port
+EXPOSE 8080
+
+# Run the manager
+CMD ["node", "manager-docker.js"]

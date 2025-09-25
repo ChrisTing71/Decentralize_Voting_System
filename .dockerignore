@@ -1,0 +1,20 @@
+# .dockerignore - Prevent unnecessary files from being copied to Docker image
+node_modules/
+npm-debug.log
+.git/
+.gitignore
+*.bat
+*.ps1
+*.sh
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.env
+docker-compose.yml
+Dockerfile
+README.md
+*.md
