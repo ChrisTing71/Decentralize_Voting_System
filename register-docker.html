@@ -261,8 +261,8 @@
         <div class="panel" id="controlPanel">
             <div class="header">
                 <h1>
-                    🚀 Launch Node
-                    <span class="docker-badge">🐳 Docker</span>
+                    Launch Node
+                    <span class="docker-badge">Docker</span>
                 </h1>
             </div>
             
@@ -273,7 +273,7 @@
             </div>
             
             <div class="info-box">
-                <h3>📦 Container Deployment</h3>
+                <h3>Container Deployment</h3>
                 <p>Each node runs in an isolated Docker container with automatic network discovery via UDP broadcast.</p>
             </div>
             
@@ -292,7 +292,7 @@
                     <button type="button" class="btn secondary" onclick="addPeerInput()" style="width: auto; padding: 8px 15px; font-size: 14px;">+ Add Peer</button>
                 </div>
                 <button type="button" id="launchBtn" class="btn" onclick="launchNode()" disabled>
-                    <span id="launchBtnText">🐳 Launch Container Node</span>
+                    <span id="launchBtnText">Launch Container Node</span>
                 </button>
                 <div id="statusMessage" class="status-message" style="display: none;"></div>
             </form>
@@ -300,10 +300,10 @@
 
         <div class="panel" id="runningNodes">
             <div class="header">
-                <h1>🌐 Container Network</h1>
+                <h1>Container Network</h1>
             </div>
             <div class="info-box">
-                <h3>🔍 Auto-Discovery</h3>
+                <h3>Auto-Discovery</h3>
                 <p>Nodes automatically discover each other via UDP broadcast on port 41234.</p>
             </div>
             <div id="nodeList">
@@ -336,12 +336,12 @@
                 if (dockerAvailable) {
                     statusDiv.className = 'docker-status connected';
                     statusDot.className = 'status-dot connected';
-                    statusText.textContent = `✅ Docker connected (${status.platform})`;
+                    statusText.textContent = `Docker connected (${status.platform})`;
                     launchBtn.disabled = false;
                 } else {
                     statusDiv.className = 'docker-status disconnected';
                     statusDot.className = 'status-dot';
-                    statusText.textContent = '❌ Docker not available - Make sure Docker Desktop is running';
+                    statusText.textContent = 'Docker not available - Make sure Docker Desktop is running';
                     launchBtn.disabled = true;
                     showStatus('Docker is not running. Please start Docker Desktop and refresh the page.', 'warning');
                 }
@@ -349,7 +349,7 @@
                 console.error('Failed to check Docker status:', error);
                 statusDiv.className = 'docker-status disconnected';
                 statusDot.className = 'status-dot';
-                statusText.textContent = '❌ Cannot connect to manager service';
+                statusText.textContent = 'Cannot connect to manager service';
                 launchBtn.disabled = true;
             }
         }
@@ -380,7 +380,7 @@
                 // Disable button and show loading state
                 launchBtn.disabled = true;
                 launchBtnText.innerHTML = '<span class="loading-spinner"></span> Creating container...';
-                showStatus('🐳 Creating Docker container...', 'success');
+                showStatus('Creating Docker container...', 'success');
                 
                 const response = await fetch(`${MANAGER_API_URL}/api/launch-node`, {
                     method: 'POST',
@@ -391,7 +391,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    showStatus(`✅ Container launched! Opening GUI...`, 'success');
+                    showStatus(`Container launched! Opening GUI...`, 'success');
                     
                     // Clear form
                     nodeNameInput.value = '';
@@ -416,7 +416,7 @@
             } finally {
                 // Re-enable button and restore text
                 launchBtn.disabled = !dockerAvailable;
-                launchBtnText.textContent = '🐳 Launch Container Node';
+                launchBtnText.textContent = 'Launch Container Node';
             }
         }
 
@@ -469,7 +469,7 @@
                             <div class="main-info">
                                 <span class="status-indicator"></span>
                                 <strong>${node.name}</strong>
-                                <span class="container-badge">🐳 Container</span>
+                                <span class="container-badge">Container</span>
                                 <span>Port ${node.port}</span>
                             </div>
                             <div class="details">
@@ -479,7 +479,7 @@
                         </div>
                         <div class="node-actions">
                             <a href="voting-gui.html?nodeId=${node.name}&host=localhost&port=${node.port}&t=${Date.now()}" 
-                               target="_blank" class="gui-link">📊 GUI</a>
+                               target="_blank" class="gui-link">GUI</a>
                             <button class="btn danger" onclick="stopNode('${node.name}')" 
                                     style="width: auto; padding: 8px 15px; font-size: 14px;">Stop</button>
                         </div>

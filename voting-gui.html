@@ -186,21 +186,8 @@
             }
 
             .panel h3::before {
-                content: "🗳️";
                 margin-right: 10px;
                 font-size: 1.2em;
-            }
-
-            .panel.peers h3::before {
-                content: "🌐";
-            }
-
-            .panel.results h3::before {
-                content: "📊";
-            }
-
-            .panel.verification h3::before {
-                content: "🔍";
             }
 
             .form-group {
@@ -400,12 +387,12 @@
     <body>
         <div class="container">
             <div class="header">
-                <h1>🔒 P2P Anonymous Voting System</h1>
+                <h1>P2P Anonymous Voting System</h1>
                 <p>Decentralized • Encrypted • Anonymous • Verifiable</p>
             </div>
             <!-- Connection Validation Panel -->
             <div class="connection-validation" id="connectionValidation">
-                <div id="validationMessage">🔍 Validating connection parameters...</div>
+                <div id="validationMessage">Validating connection parameters...</div>
                 <div class="parameter-display" id="parameterDisplay"></div>
             </div>
 
@@ -424,7 +411,7 @@
 
             <!-- Error Message (hidden by default) -->
             <div class="error-message" id="errorMessage" style="display: none;">
-                ⚠️ Connection failed. Make sure the node is running and try refreshing the page.
+                Connection failed. Make sure the node is running and try refreshing the page.
             </div>
 
             <!-- Main Interface -->
@@ -472,7 +459,7 @@
                             <input type="text" id="choicesInput" placeholder="e.g., yes,no,abstain or red,blue,green">
                             <small style="color: #666; font-size: 0.9em;">Leave empty for free-text voting</small>
                         </div>
-                        <button class="btn" onclick="startVote()">🗳️ Start Voting Round</button>
+                        <button class="btn" onclick="startVote()">Start Voting Round</button>
                     </div>
 
                     <div class="panel">
@@ -489,7 +476,7 @@
                         <div id="peersList" class="peer-list">
                             <div style="color: #666;">Connecting to peers...</div>
                         </div>
-                        <button class="btn secondary" onclick="refreshStatus()">🔄 Refresh Status</button>
+                        <button class="btn secondary" onclick="refreshStatus()">Refresh Status</button>
                     </div>
 
                     <div class="panel results">
@@ -502,7 +489,7 @@
             </div>
 
             <div class="log-container" id="logContainer">
-                <div>📡 Initializing connection...</div>
+                <div>Initializing connection...</div>
             </div>
         </div>
 
@@ -531,9 +518,9 @@
                 try {
                     localStorage.clear();
                     sessionStorage.clear();
-                    console.log('🧹 Cleared browser storage');
+                    console.log('Cleared browser storage');
                 } catch (e) {
-                    console.log('⚠️ Could not clear browser storage:', e.message);
+                    console.log('Could not clear browser storage:', e.message);
                 }
             }
 
@@ -569,10 +556,10 @@
                 
                 if (params.nodeId === 'unknown' || params.port === '3001' && params.timestamp === 'none') {
                     validation.classList.remove('success');
-                    validationMsg.innerHTML = '⚠️ WARNING: Using default parameters. This might connect to the wrong node!';
+                    validationMsg.innerHTML = 'WARNING: Using default parameters. This might connect to the wrong node!';
                 } else {
                     validation.classList.add('success');
-                    validationMsg.innerHTML = `✅ Connection parameters validated for ${params.nodeId} → port ${params.port}`;
+                    validationMsg.innerHTML = `Connection parameters validated for ${params.nodeId} → port ${params.port}`;
                 }
                 
                 return params;
@@ -612,13 +599,13 @@
                         isConnected = true;
                         reconnectAttempts = 0;
                         updateConnectionStatus(true);
-                        addLog(`✅ Connected to node ${currentNodeId} at port ${currentPort}`);
+                        addLog(`Connected to node ${currentNodeId} at port ${currentPort}`);
                         
                         // Update validation panel to show successful connection
                         const validation = document.getElementById('connectionValidation');
                         const validationMsg = document.getElementById('validationMessage');
                         validation.classList.add('success');
-                        validationMsg.innerHTML = `🎉 Successfully connected to ${currentNodeId} on port ${currentPort}`;
+                        validationMsg.innerHTML = `Successfully connected to ${currentNodeId} on port ${currentPort}`;
                         
                         // Send handshake
                         ws.send(JSON.stringify({
@@ -636,20 +623,20 @@
                     };
                     
                     ws.onerror = (error) => {
-                        addLog(`❌ Connection error: Check if node ${currentNodeId} is running on port ${currentPort}`);
+                        addLog(`Connection error: Check if node ${currentNodeId} is running on port ${currentPort}`);
                         updateConnectionStatus(false);
                         
                         // Update validation panel to show error
                         const validation = document.getElementById('connectionValidation');
                         const validationMsg = document.getElementById('validationMessage');
                         validation.classList.remove('success');
-                        validationMsg.innerHTML = `❌ Failed to connect to ${currentNodeId} on port ${currentPort}`;
+                        validationMsg.innerHTML = `Failed to connect to ${currentNodeId} on port ${currentPort}`;
                     };
                     
                     ws.onclose = () => {
                         isConnected = false;
                         updateConnectionStatus(false);
-                        addLog('❌ Disconnected from node');
+                        addLog('Disconnected from node');
                         
                         // Auto-reconnect with exponential backoff
                         if (reconnectAttempts < maxReconnectAttempts) {
@@ -658,13 +645,13 @@
                             addLog(`🔄 Reconnecting in ${delay/1000} seconds... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
                             setTimeout(connectToNode, delay);
                         } else {
-                            addLog('❌ Max reconnection attempts reached. Click Reconnect to try again.');
+                            addLog('Max reconnection attempts reached. Click Reconnect to try again.');
                             document.getElementById('errorMessage').style.display = 'block';
                         }
                     };
                     
                 } catch (error) {
-                    addLog(`❌ Failed to create WebSocket: ${error.message}`);
+                    addLog(`Failed to create WebSocket: ${error.message}`);
                     updateConnectionStatus(false);
                 }
             }
@@ -702,7 +689,7 @@
             function handleMessage(message) {
                 // Don't log heartbeats
                 if (message.type !== 'HEARTBEAT') {
-                    addLog(`📨 Received: ${message.type}`);
+                    addLog(`Received: ${message.type}`);
                 }
                 
                 switch (message.type) {
@@ -726,7 +713,7 @@
 
             function sendCommand(command, args = []) {
                 if (!ws || ws.readyState !== WebSocket.OPEN) {
-                    addLog('❌ Not connected to node');
+                    addLog('Not connected to node');
                     return;
                 }
                 
@@ -826,7 +813,7 @@
 
                 if (hasVoted) {
                     container.innerHTML = `
-                        <p style="color: #28a745;">✅ You have already voted in this round</p>
+                        <p style="color: #28a745;">You have already voted in this round</p>
                         <p style="font-size: 0.9em; color: #666;">Your vote is encrypted and anonymous</p>
                     `;
                     return;
@@ -870,7 +857,7 @@
                     lastServerTime = status.timeRemaining;
                     // ONLY sync if we don't have a timer running at all
                     if (!timerInterval) {
-                        addLog(`⏰ Starting timer for active phase ${status.phase}: ${status.timeRemaining}s`);
+                        addLog(`Starting timer for active phase ${status.phase}: ${status.timeRemaining}s`);
                         syncTimerWithServer(status.timeRemaining);
                     }
                     // CRITICAL: If we have a timer running, DO NOT SYNC AT ALL during voting
@@ -890,7 +877,7 @@
                 } else if (!isActiveVotingPhase) {
                     // Phase is not active voting (FINISHED, WAITING, etc.) - stop timer
                     if (timerInterval) {
-                        addLog(`⏹️ Stopping timer: phase changed to ${status.phase}`);
+                        addLog(`Stopping timer: phase changed to ${status.phase}`);
                         stopTimer();
                     }
                     const timerElement = document.getElementById('timeRemaining');
@@ -935,14 +922,14 @@
                 // Update immediately
                 updateTimerDisplay();
                 
-                addLog(`⏰ Timer started: ${durationSeconds} seconds (client-side)`);
+                addLog(`Timer started: ${durationSeconds} seconds (client-side)`);
             }
             
             function stopTimer() {
                 if (timerInterval) {
                     clearInterval(timerInterval);
                     timerInterval = null;
-                    addLog(`⏹️ Client timer stopped`);
+                    addLog(`Client timer stopped`);
                 }
                 roundStartTime = null;
                 roundDuration = null;
@@ -970,7 +957,7 @@
                 if (lastDisplayedTime !== null && lastDisplayedTime !== remaining) {
                     const timeDiff = lastDisplayedTime - remaining;
                     if (timeDiff > 1) {
-                        addLog(`⚠️ Timer jump detected: ${lastDisplayedTime}s → ${remaining}s (jump of ${timeDiff}s)`);
+                        addLog(`Timer jump detected: ${lastDisplayedTime}s → ${remaining}s (jump of ${timeDiff}s)`);
                     }
                 }
                 lastDisplayedTime = remaining;
@@ -999,7 +986,7 @@
                     timerElement.textContent = '0s';
                     timerElement.className = 'timer-value critical';
                     if (progressElement) progressElement.style.width = '100%';
-                    addLog('⏰ Client timer reached zero');
+                    addLog('Client timer reached zero');
                     
                     // Clean up timer variables but don't reset to null yet 
                     // in case server updates are still coming
@@ -1018,7 +1005,7 @@
                 
                 if (serverTimeRemaining > 0 && !timerInterval) {
                     // Case 1: No timer running but server says there should be one
-                    addLog(`⏰ Starting timer from server sync: ${serverTimeRemaining}s`);
+                    addLog(`Starting timer from server sync: ${serverTimeRemaining}s`);
                     startTimer(serverTimeRemaining);
                     return;
                 }
@@ -1042,10 +1029,10 @@
                 
                 // Initialize client-side timer - always start fresh timer for new rounds
                 if (message.votingTimeSeconds) {
-                    addLog(`🗳️ Voting round started: ${message.topic} (${message.votingTimeSeconds}s)`);
+                    addLog(`Voting round started: ${message.topic} (${message.votingTimeSeconds}s)`);
                     startTimer(message.votingTimeSeconds);
                 } else {
-                    addLog(`🗳️ Voting round started: ${message.topic}`);
+                    addLog(`Voting round started: ${message.topic}`);
                 }
                 
                 updateVotingInterface();
@@ -1063,7 +1050,7 @@
                     }
                 }
                 
-                addLog(`🔄 Phase changed to: ${message.phase}`);
+                addLog(`Phase changed to: ${message.phase}`);
                 updateVotingInterface();
             }
 
@@ -1083,12 +1070,12 @@
                 } else {
                     container.innerHTML = '<div style="color: #666;">No results to display</div>';
                 }
-                addLog('📊 Results received');
+                addLog('Results received');
             }
 
             function handleCommandResponse(message) {
                 if (message.response) {
-                    addLog(`📋 ${message.response}`);
+                    addLog(`${message.response}`);
                 }
             }
 
