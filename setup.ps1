@@ -20,25 +20,25 @@ function Test-Command {
 # Function to display errors
 function Show-Error {
     param($Message)
-    Write-Host "❌ $Message" -ForegroundColor Red
+    Write-Host " $Message" -ForegroundColor Red
 }
 
 # Function to display success
 function Show-Success {
     param($Message)
-    Write-Host "✅ $Message" -ForegroundColor Green
+    Write-Host " $Message" -ForegroundColor Green
 }
 
 # Function to display info
 function Show-Info {
     param($Message)
-    Write-Host "📦 $Message" -ForegroundColor Yellow
+    Write-Host " $Message" -ForegroundColor Yellow
 }
 
 # Function to display warning
 function Show-Warning {
     param($Message)
-    Write-Host "⚠️ $Message" -ForegroundColor Yellow
+    Write-Host " $Message" -ForegroundColor Yellow
 }
 
 # Check if Docker is installed
@@ -285,7 +285,7 @@ Write-Host "Manager will be available at:" -ForegroundColor Green
 Write-Host "http://localhost:8080/register-docker.html" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "⚠️ IMPORTANT: Docker Desktop must remain running!" -ForegroundColor Yellow
+Write-Host " IMPORTANT: Docker Desktop must remain running!" -ForegroundColor Yellow
 Write-Host "The manager needs Docker to create containers." -ForegroundColor Gray
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the manager" -ForegroundColor Yellow
