@@ -44,14 +44,14 @@ class VotingNodeWithAutoGUI {
 		
 		// First, validate our node ID isn't already in use
 		if (this.knownPeers.length > 0) {
-			console.log('🔍 Validating node ID uniqueness...');
+			console.log('Validating node ID uniqueness...');
 			const isDuplicate = await this.validateNodeIdUniqueness();
 			
 			if (isDuplicate) {
-				console.log('❌ CRITICAL ERROR: Node ID already exists on network!');
+				console.log('CRITICAL ERROR: Node ID already exists on network!');
 				console.log(`   The node ID '${this.nodeId}' is already in use.`);
 				console.log('   Please choose a different node ID and restart.');
-				console.log('\n🔧 Suggested alternatives:');
+				console.log('\n Suggested alternatives:');
 				console.log(`   - ${this.nodeId}_${Date.now().toString().slice(-4)}`);
 				console.log(`   - ${this.nodeId}_${Math.random().toString(36).substr(2, 4)}`);
 				console.log(`   - ${this.nodeId}_backup`);
@@ -80,9 +80,9 @@ class VotingNodeWithAutoGUI {
 		
 		if (this.guiEnabled) {
 			this.startGUIUpdates();
-			console.log('🖥️ GUI support enabled');
+			console.log('GUI support enabled');
 			// 已移除自動打開GUI網頁功能，因為有 manager.js 提供跳轉功能
-			console.log('💡 Use manager.js to launch and manage GUI interfaces');
+			console.log('Use manager.js to launch and manage GUI interfaces');
 		}
 		
 		this.showHelp();
@@ -101,18 +101,18 @@ class VotingNodeWithAutoGUI {
 				.map(result => result.value);
 			
 			if (duplicates.length > 0) {
-				console.log('🚨 Duplicate node ID detected on the following peers:');
+				console.log('Duplicate node ID detected on the following peers:');
 				duplicates.forEach(dup => {
 					console.log(`   - ${dup.address} (last seen: ${new Date(dup.lastSeen).toLocaleString()})`);
 				});
 				return true;
 			}
 			
-			console.log('✅ Node ID validation passed - no duplicates found');
+			console.log('Node ID validation passed - no duplicates found');
 			return false;
 			
 		} catch (error) {
-			console.log(`⚠️ Node ID validation failed due to error: ${error.message}`);
+			console.log(`Node ID validation failed due to error: ${error.message}`);
 			console.log('Proceeding with startup but duplicate detection may be incomplete');
 			return false;
 		}
@@ -202,7 +202,7 @@ class VotingNodeWithAutoGUI {
 	handleMessage(message, ws) {
 		// Detect duplicate node IDs during handshake
 		if ((message.type === 'HANDSHAKE' || message.type === 'HANDSHAKE_ACK') && message.from === this.nodeId) {
-			console.log('🚨 DUPLICATE NODE ID DETECTED!');
+			console.log('DUPLICATE NODE ID DETECTED!');
 			console.log(`   Another node with ID '${this.nodeId}' is trying to connect`);
 			console.log('   This can cause serious network issues. Rejecting connection.');
 			
@@ -230,10 +230,10 @@ class VotingNodeWithAutoGUI {
 		
 		// Handle duplicate rejection (if we're the duplicate)
 		if (message.type === 'DUPLICATE_NODE_REJECTION') {
-			console.log('❌ FATAL ERROR: This node ID is already in use on the network!');
+			console.log('FATAL ERROR: This node ID is already in use on the network!');
 			console.log(`   Message from network: ${message.message}`);
 			console.log(`   Existing node: ${message.existingNodeId}`);
-			console.log('\n🔧 To fix this issue:');
+			console.log('\n To fix this issue:');
 			console.log('   1. Stop this node (Ctrl+C)');
 			console.log('   2. Choose a different node ID');
 			console.log('   3. Restart with the new ID');
@@ -254,7 +254,7 @@ class VotingNodeWithAutoGUI {
 	}
 
 	async performFinalDuplicateCheck() {
-		console.log('🔍 Performing final duplicate node check...');
+		console.log('Performing final duplicate node check...');
 		
 		// Wait a moment for network to stabilize
 		await new Promise(resolve => setTimeout(resolve, 2000));
@@ -265,7 +265,7 @@ class VotingNodeWithAutoGUI {
 		for (const [peerId, ws] of this.peers) {
 			if (this.activePeers.has(peerId)) {
 				if (connectedNodeIds.has(peerId)) {
-					console.log(`🚨 Multiple connections detected for node ID: ${peerId}`);
+					console.log(`Multiple connections detected for node ID: ${peerId}`);
 					console.log('   This indicates a duplicate node problem');
 				} else {
 					connectedNodeIds.add(peerId);
@@ -273,7 +273,7 @@ class VotingNodeWithAutoGUI {
 			}
 		}
 		
-		console.log(`✅ Final validation complete. Connected to ${connectedNodeIds.size} unique nodes`);
+		console.log(`Final validation complete. Connected to ${connectedNodeIds.size} unique nodes`);
 		this.startupValidationComplete = true;
 	}
 
@@ -288,12 +288,12 @@ class VotingNodeWithAutoGUI {
 			const randomId = Math.random().toString(36).substring(7);
 			const url = `file:///${guiPath.replace(/\\/g, '/')}?nodeId=${this.nodeId}&host=localhost&port=${this.port}&peers=${peers}&t=${timestamp}&r=${randomId}&node=${this.nodeId}`;
 			
-			console.log('🌐 GUI URL for node', this.nodeId);
-			console.log('📡 Connection: localhost:' + this.port);
-			console.log('� URL:', url);
-			console.log('💡 Use manager.js to launch this GUI automatically');
+			console.log('GUI URL for node', this.nodeId);
+			console.log('Connection: localhost:' + this.port);
+			console.log('URL:', url);
+			console.log('Use manager.js to launch this GUI automatically');
 		} else {
-			console.log('⚠️ GUI file not found:', guiPath);
+			console.log('GUI file not found:', guiPath);
 			console.log('   Make sure voting-gui.html is in the same directory');
 		}
 	}
@@ -303,7 +303,7 @@ class VotingNodeWithAutoGUI {
 
         this.discoverySocket.on('listening', () => {
             const address = this.discoverySocket.address();
-            console.log(`📡 LAN discovery service listening on ${address.address}:${address.port}`);
+            console.log(`LAN discovery service listening on ${address.address}:${address.port}`);
             this.discoverySocket.setBroadcast(true);
 
             // Start broadcasting our presence periodically
@@ -325,10 +325,10 @@ class VotingNodeWithAutoGUI {
                 const isKnown = Array.from(this.peerAddresses.values()).some(addr => addr.host === rinfo.address && addr.port === peerInfo.port);
 
                 if (!isConnected && !isKnown) {
-                    console.log(`👋 Discovered peer ${peerInfo.nodeId} at ${rinfo.address}:${peerInfo.port}`);
+                    console.log(`Discovered peer ${peerInfo.nodeId} at ${rinfo.address}:${peerInfo.port}`);
                     // Attempt to connect to the discovered peer
                     this.connectToPeer(rinfo.address, peerInfo.port).catch(err => {
-                        console.log(`❌ Failed to connect to discovered peer ${peerInfo.nodeId}: ${err.message}`);
+                        console.log(`Failed to connect to discovered peer ${peerInfo.nodeId}: ${err.message}`);
                     });
                 }
             } catch (error) {
@@ -376,7 +376,7 @@ class VotingNodeWithAutoGUI {
 	}
     
     async connectToKnownPeers() {
-        console.log(`🌐 Connecting to ${this.knownPeers.length} known peers...`);
+        console.log(`Connecting to ${this.knownPeers.length} known peers...`);
         
         for (const peer of this.knownPeers) {
             try {
@@ -388,12 +388,12 @@ class VotingNodeWithAutoGUI {
             }
         }
         
-        console.log(`✅ Connection phase complete. Connected to ${this.peers.size} peers.`);
+        console.log(`Connection phase complete. Connected to ${this.peers.size} peers.`);
     }
 	
 	async processPeerExchange(receivedPeers, fromNode) {
-		console.log(`🔍 Received ${receivedPeers.length} peers from ${fromNode}:`);
-		
+		console.log(`Received ${receivedPeers.length} peers from ${fromNode}:`);
+
 		// Log all received peers for debugging
 		for (const peer of receivedPeers) {
 			console.log(`  - ${peer.nodeId || 'unknown'}@${peer.host}:${peer.port}`);
@@ -402,23 +402,23 @@ class VotingNodeWithAutoGUI {
 		let newConnectionAttempts = 0;
 		
 		for (const peerInfo of receivedPeers) {
-			console.log(`\n🔎 Evaluating peer: ${peerInfo.nodeId || 'unknown'}@${peerInfo.host}:${peerInfo.port}`);
+			console.log(`\nEvaluating peer: ${peerInfo.nodeId || 'unknown'}@${peerInfo.host}:${peerInfo.port}`);
 			
 			// Skip if this is ourselves
 			if (peerInfo.nodeId === this.nodeId) {
-				console.log(`  ⏭️ Skipping self (${this.nodeId})`);
+				console.log(`  Skipping self (${this.nodeId})`);
 				continue;
 			}
 			
 			// Skip if we're already connected to this peer
 			if (peerInfo.nodeId && this.peers.has(peerInfo.nodeId)) {
-				console.log(`  ⏭️ Already connected to ${peerInfo.nodeId}`);
+				console.log(`  Already connected to ${peerInfo.nodeId}`);
 				continue;
 			}
 			
 			// Skip if we don't have enough info to connect
 			if (!peerInfo.host || !peerInfo.port) {
-				console.log(`  ⏭️ Missing connection info (host: ${peerInfo.host}, port: ${peerInfo.port})`);
+				console.log(`  Missing connection info (host: ${peerInfo.host}, port: ${peerInfo.port})`);
 				continue;
 			}
 			
@@ -428,18 +428,18 @@ class VotingNodeWithAutoGUI {
 			);
 			
 			if (alreadyKnown) {
-				console.log(`  ⏭️ Already in known peers list`);
+				console.log(`  Already in known peers list`);
 				continue;
 			}
 			
 			// Skip if this is the same as our own address
 			if (peerInfo.host === 'localhost' && peerInfo.port === this.port) {
-				console.log(`  ⏭️ Skipping our own address (localhost:${this.port})`);
+				console.log(`  Skipping our own address (localhost:${this.port})`);
 				continue;
 			}
 			
 			// Attempt to connect to this new peer
-			console.log(`  🌐 Will attempt connection to: ${peerInfo.nodeId || 'unknown'}@${peerInfo.host}:${peerInfo.port}`);
+			console.log(`  Will attempt connection to: ${peerInfo.nodeId || 'unknown'}@${peerInfo.host}:${peerInfo.port}`);
 			
 			try {
 				// Add to our known peers list for future reference
@@ -453,9 +453,9 @@ class VotingNodeWithAutoGUI {
 					console.log(`🔗 Starting connection attempt to ${peerInfo.host}:${peerInfo.port}...`);
 					try {
 						await this.connectToPeer(peerInfo.host, peerInfo.port);
-						console.log(`✅ Successfully connected to discovered peer ${peerInfo.host}:${peerInfo.port}`);
+						console.log(`Successfully connected to discovered peer ${peerInfo.host}:${peerInfo.port}`);
 					} catch (error) {
-						console.log(`❌ Failed to connect to discovered peer ${peerInfo.host}:${peerInfo.port}: ${error.message}`);
+						console.log(`Failed to connect to discovered peer ${peerInfo.host}:${peerInfo.port}: ${error.message}`);
 						// Remove from known peers if connection failed
 						this.knownPeers = this.knownPeers.filter(known => 
 							!(known.host === peerInfo.host && known.port === peerInfo.port)
@@ -467,19 +467,19 @@ class VotingNodeWithAutoGUI {
 				
 				// Limit the number of simultaneous connection attempts
 				if (newConnectionAttempts >= 3) {
-					console.log(`⚠️ Limiting peer discovery to 3 simultaneous connections`);
+					console.log(`Limiting peer discovery to 3 simultaneous connections`);
 					break;
 				}
 				
 			} catch (error) {
-				console.log(`❌ Error processing peer ${peerInfo.host}:${peerInfo.port}: ${error.message}`);
+				console.log(`Error processing peer ${peerInfo.host}:${peerInfo.port}: ${error.message}`);
 			}
 		}
 		
 		if (newConnectionAttempts > 0) {
-			console.log(`🚀 Attempting to connect to ${newConnectionAttempts} newly discovered peers`);
+			console.log(`Attempting to connect to ${newConnectionAttempts} newly discovered peers`);
 		} else {
-			console.log(`📋 No new peers to connect to from ${fromNode}`);
+			console.log(`No new peers to connect to from ${fromNode}`);
 		}
 	}
 	
@@ -492,7 +492,7 @@ class VotingNodeWithAutoGUI {
 			peers: peerList
 		}));
 		
-		console.log(`📋 Sent peer list (${peerList.length} peers) to requesting node`);
+		console.log(`Sent peer list (${peerList.length} peers) to requesting node`);
 	}
 	
 	getKnownPeersList() {
@@ -521,20 +521,20 @@ class VotingNodeWithAutoGUI {
 			}
 		}
 		
-		console.log(`📋 Sharing ${peersList.length} known peers:`, peersList.map(p => `${p.nodeId || 'unknown'}@${p.host}:${p.port}`));
+		console.log(`Sharing ${peersList.length} known peers:`, peersList.map(p => `${p.nodeId || 'unknown'}@${p.host}:${p.port}`));
 		return peersList;
 	}
 
     async connectToPeer(host, port) {
 		const peerAddress = `${host}:${port}`;
-		console.log(`🔗 Attempting to connect to ${peerAddress}`);
+		console.log(`Attempting to connect to ${peerAddress}`);
 		
 		return new Promise((resolve, reject) => {
 			const ws = new WebSocket(`ws://${host}:${port}`);
 			let handshakeReceived = false;
 			
 			ws.on('open', () => {
-				console.log(`✅ Connected to ${peerAddress}`);
+				console.log(`Connected to ${peerAddress}`);
 				// Send handshake with duplicate detection info
 				ws.send(JSON.stringify({
 					type: 'HANDSHAKE',
@@ -552,7 +552,7 @@ class VotingNodeWithAutoGUI {
 					
 					// Check for duplicate rejection before processing other messages
 					if (message.type === 'DUPLICATE_NODE_REJECTION') {
-						console.log(`❌ Connection rejected by ${peerAddress}: ${message.reason}`);
+						console.log(`Connection rejected by ${peerAddress}: ${message.reason}`);
 						ws.close();
 						reject(new Error('Duplicate node ID detected'));
 						return;
@@ -565,7 +565,7 @@ class VotingNodeWithAutoGUI {
 			});
 			
 			ws.on('close', () => {
-				console.log(`❌ Connection to ${peerAddress} closed`);
+				console.log(`Connection to ${peerAddress} closed`);
 				// Find and remove this peer
 				for (const [peerId, peerWs] of this.peers.entries()) {
 					if (peerWs === ws) {
@@ -579,14 +579,14 @@ class VotingNodeWithAutoGUI {
 			});
 			
 			ws.on('error', (error) => {
-				console.log(`❌ Failed to connect to ${peerAddress}: ${error.message}`);
+				console.log(`Failed to connect to ${peerAddress}: ${error.message}`);
 				reject(error);
 			});
 		});
 	}
 	
 	handleIncomingConnection(ws, req) {
-		console.log(`📞 Incoming connection from ${req.socket.remoteAddress}`);
+		console.log(`Incoming connection from ${req.socket.remoteAddress}`);
 		
 		ws.on('message', (data) => {
 			try {
@@ -636,7 +636,7 @@ class VotingNodeWithAutoGUI {
     handleGUIConnection(ws, message) {
         const clientId = message.from;
         this.guiClients.set(clientId, ws);
-        console.log(`🖥️ GUI client connected: ${clientId}`);
+        console.log(`GUI client connected: ${clientId}`);
         
         // Send initial status to GUI
         this.sendStatusToGUI(ws);
@@ -656,7 +656,7 @@ class VotingNodeWithAutoGUI {
 
     handleGUICommand(message, ws) {
         const { command, args } = message;
-        console.log(`🖥️ GUI command: ${command} ${args ? args.join(' ') : ''}`);
+        console.log(`GUI command: ${command} ${args ? args.join(' ') : ''}`);
         
         let response = '';
         
@@ -766,12 +766,12 @@ class VotingNodeWithAutoGUI {
 	originalHandleMessage(message, ws) {
 		// Don't log heartbeats to reduce spam
 		if (message.type !== 'HEARTBEAT') {
-			console.log(`📨 Received ${message.type} from ${message.from}`);
+			console.log(`Received ${message.type} from ${message.from}`);
 		}
 		
 		switch (message.type) {
 			case 'HANDSHAKE':
-				console.log(`🤝 Handshake from ${message.from}`);
+				console.log(`Handshake from ${message.from}`);
 				this.peers.set(message.from, ws);
 				this.activePeers.add(message.from);
 				
@@ -785,7 +785,7 @@ class VotingNodeWithAutoGUI {
 						host: host,
 						port: message.port
 					});
-					console.log(`📍 Stored address for ${message.from}: ${host}:${message.port}`);
+					console.log(`Stored address for ${message.from}: ${host}:${message.port}`);
 				}
 				
 				console.log(`Connected to peer ${message.from}`);
@@ -807,7 +807,7 @@ class VotingNodeWithAutoGUI {
 				break;
 				
 			case 'HANDSHAKE_ACK':
-				console.log(`🤝 Handshake ACK from ${message.from}`);
+				console.log(`Handshake ACK from ${message.from}`);
 				if (!this.peers.has(message.from)) {
 					this.peers.set(message.from, ws);
 				}
@@ -822,12 +822,12 @@ class VotingNodeWithAutoGUI {
 						host: host,
 						port: message.port
 					});
-					console.log(`📍 Stored address for ${message.from}: ${host}:${message.port}`);
+					console.log(`Stored address for ${message.from}: ${host}:${message.port}`);
 				}
 				
 				// Process any peers they shared in the handshake
 				if (message.knownPeers && message.knownPeers.length > 0) {
-					console.log(`🔍 Processing ${message.knownPeers.length} peers from handshake`);
+					console.log(`Processing ${message.knownPeers.length} peers from handshake`);
 					this.processPeerExchange(message.knownPeers, message.from);
 				}
 				break;
@@ -871,7 +871,7 @@ class VotingNodeWithAutoGUI {
 				break;
 				
 			case 'ROUND_START':
-				console.log(`📢 Processing ROUND_START: ${message.topic}`);
+				console.log(`Processing ROUND_START: ${message.topic}`);
 				this.handleRoundStart(message);
 				
 				// ENHANCED: Immediately notify GUI clients about the new round
@@ -900,7 +900,7 @@ class VotingNodeWithAutoGUI {
 			if (ws.readyState === WebSocket.OPEN) {
 				try {
 					ws.send(JSON.stringify(notification));
-					console.log(`📱 Notified GUI ${clientId} about ${eventType}`);
+					console.log(`Notified GUI ${clientId} about ${eventType}`);
 				} catch (error) {
 					console.error(`Failed to notify GUI ${clientId}:`, error.message);
 					this.guiClients.delete(clientId);
@@ -969,7 +969,7 @@ class VotingNodeWithAutoGUI {
 
         // Check if we've already voted in this round
         if (this.hasVotedInRound.get(this.currentRound.id)) {
-            console.log('❌ You have already voted in this round. Each node can only vote once.');
+            console.log('You have already voted in this round. Each node can only vote once.');
             return;
         }
 
@@ -979,7 +979,7 @@ class VotingNodeWithAutoGUI {
             const allowedNormalized = this.currentRound.allowedChoices.map(c => c.toLowerCase());
             
             if (!allowedNormalized.includes(normalizedChoice)) {
-                console.log(`❌ Invalid choice. Allowed choices: ${this.currentRound.allowedChoices.join(', ')}`);
+                console.log(`Invalid choice. Allowed choices: ${this.currentRound.allowedChoices.join(', ')}`);
                 return;
             }
         }
@@ -1031,8 +1031,8 @@ class VotingNodeWithAutoGUI {
         }
         this.encryptedVotes.get(this.currentRound.id).set(encryptedVote.anonymousVoteId, encryptedMessage);
         
-        console.log(`🔒 Encrypted vote cast and broadcasted`);
-        console.log(`📊 Total encrypted votes received: ${this.encryptedVotes.get(this.currentRound.id).size}`);
+        console.log(`Encrypted vote cast and broadcasted`);
+        console.log(`Total encrypted votes received: ${this.encryptedVotes.get(this.currentRound.id).size}`);
     }
 
     handleEncryptedVote(message) {
@@ -1054,8 +1054,8 @@ class VotingNodeWithAutoGUI {
         }
         this.encryptedVotes.get(this.currentRound.id).set(message.anonymousVoteId, message);
         
-        console.log(`🔒 Received anonymous encrypted vote (ID: ${message.anonymousVoteId.substring(0, 8)}...)`);
-        console.log(`📊 Total encrypted votes received: ${this.encryptedVotes.get(this.currentRound.id).size}`);
+        console.log(`Received anonymous encrypted vote (ID: ${message.anonymousVoteId.substring(0, 8)}...)`);
+        console.log(`Total encrypted votes received: ${this.encryptedVotes.get(this.currentRound.id).size}`);
     }
 
     // Enhanced enterConsensusPhase to notify GUI clients
@@ -1069,7 +1069,7 @@ class VotingNodeWithAutoGUI {
 		this.keysSharingComplete = false;
 		
 		console.log('\n=== CONSENSUS PHASE ===');
-		console.log('🔓 Revealing anonymous votes and calculating results...');
+		console.log('Revealing anonymous votes and calculating results...');
 		
 		// Broadcast phase change to ensure all nodes know we're in consensus
 		this.broadcast({
@@ -1086,7 +1086,7 @@ class VotingNodeWithAutoGUI {
 		
 		// Start checking if ready to propose results
 		setTimeout(() => this.checkIfReadyToPropose(), 5000); // Start checking after 5 seconds
-		console.log(`⏱️ Consensus phase started (15s dedicated time)`);
+		console.log(`Consensus phase started (15s dedicated time)`);
 		
 		// Notify GUI clients of phase change
 		this.notifyGUIClients('PHASE_CHANGE', {
@@ -1102,7 +1102,7 @@ class VotingNodeWithAutoGUI {
 		
 		// Only share keys if we actually have any
 		if (!roundKeys || roundKeys.size === 0) {
-			console.log('📭 No keys to share for this round');
+			console.log('No keys to share for this round');
 			return;
 		}
 		
@@ -1119,14 +1119,14 @@ class VotingNodeWithAutoGUI {
 		}
 		
 		if (keysToShare.length === 0) {
-			console.log('📭 No keys from our votes to share');
+			console.log('No keys from our votes to share');
 			return;
 		}
 		
 		// Shuffle the keys to break any correlation with submission order
 		this.shuffleArray(keysToShare);
 		
-		console.log(`🔑 Preparing to share ${keysToShare.length} decryption keys`);
+		console.log(`Preparing to share ${keysToShare.length} decryption keys`);
 		
 		// Broadcast keys with a random delay
 		setTimeout(() => {
@@ -1136,7 +1136,7 @@ class VotingNodeWithAutoGUI {
 				keys: keysToShare,
 				from: this.nodeId
 			});
-			console.log(`📤 Shared ${keysToShare.length} decryption keys with network`);
+			console.log(`Shared ${keysToShare.length} decryption keys with network`);
 		}, Math.random() * 1000 + 500); // Random delay 0.5-1.5 seconds
 	}
 
@@ -1173,8 +1173,8 @@ class VotingNodeWithAutoGUI {
         }
         
         if (newKeysCount > 0) {
-            console.log(`🔑 Received batch of ${newKeysCount} decryption keys from ${message.from}`);
-            console.log(`🔀 Keys shuffled to prevent correlation with vote submission order`);
+            console.log(`Received batch of ${newKeysCount} decryption keys from ${message.from}`);
+            console.log(`Keys shuffled to prevent correlation with vote submission order`);
             
             // Try to decrypt votes now that we have more keys
             this.decryptAndProcessVotes();
@@ -1207,7 +1207,7 @@ class VotingNodeWithAutoGUI {
                 keyProvider: message.from
             });
             
-            console.log(`🔑 Received decryption key for vote ${message.anonymousVoteId.substring(0, 8)}... from ${message.from}`);
+            console.log(`Received decryption key for vote ${message.anonymousVoteId.substring(0, 8)}... from ${message.from}`);
             
             // Try to decrypt the vote now that we have the key
             this.decryptAndProcessVotes();
@@ -1261,8 +1261,8 @@ class VotingNodeWithAutoGUI {
         }
         
         if (newlyDecrypted > 0) {
-            console.log(`🔓 Successfully decrypted ${newlyDecrypted} more anonymous votes`);
-            console.log(`📊 Total decrypted votes: ${decryptedVotes.size}/${encryptedVotes.size}`);
+            console.log(`Successfully decrypted ${newlyDecrypted} more anonymous votes`);
+            console.log(`Total decrypted votes: ${decryptedVotes.size}/${encryptedVotes.size}`);
         }
     }
 	  
@@ -1304,7 +1304,7 @@ class VotingNodeWithAutoGUI {
 		
 		// Only log non-heartbeat broadcasts to reduce spam
 		if (message.type !== 'HEARTBEAT') {
-			console.log(`📤 Broadcast ${message.type} to ${sentCount} peers + ${this.guiClients.size} GUI clients`);
+			console.log(`Broadcast ${message.type} to ${sentCount} peers + ${this.guiClients.size} GUI clients`);
 		}
 	}
 
@@ -1329,7 +1329,7 @@ class VotingNodeWithAutoGUI {
         // Validate voting time: min 30 seconds, max 600 seconds (10 minutes), default 100 seconds
         // Note: This is pure voting time - consensus phase gets additional fixed time
         if (typeof votingTimeSeconds !== 'number' || votingTimeSeconds < 30 || votingTimeSeconds > 600) {
-            console.log(`⚠️ Invalid voting time: ${votingTimeSeconds}s. Using default 100 seconds.`);
+            console.log(`Invalid voting time: ${votingTimeSeconds}s. Using default 100 seconds.`);
             console.log('   Valid range: 30-600 seconds (0.5-10 minutes) for voting phase only');
             votingTimeSeconds = 100;
         }
@@ -1383,10 +1383,10 @@ class VotingNodeWithAutoGUI {
         if (allowedChoices) {
             console.log(`Allowed choices: ${allowedChoices.join(', ')}`);
         }
-        console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-        console.log(`⏰ Voting phase: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
-        console.log(`🔓 Consensus phase: ${consensusPhaseMs/1000} seconds (fixed)`);
-        console.log(`📊 Total round time: ${Math.round(totalRoundMs/1000)} seconds`);
+        console.log(`Private voting enabled - votes are encrypted until consensus phase`);
+        console.log(`Voting phase: ${votingTimeSeconds} seconds (${Math.round(votingTimeSeconds/60*10)/10} minutes)`);
+        console.log(`Consensus phase: ${consensusPhaseMs/1000} seconds (fixed)`);
+        console.log(`Total round time: ${Math.round(totalRoundMs/1000)} seconds`);
         console.log(`Active nodes: ${this.getActiveNodeCount()}`);
         console.log(`Type 'vote <choice>' to cast your encrypted vote`);
         
@@ -1398,12 +1398,12 @@ class VotingNodeWithAutoGUI {
     }
 	
 	handleRoundStart(message) {
-		console.log(`🔄 Handling ROUND_START from ${message.from}`);
+		console.log(`Handling ROUND_START from ${message.from}`);
 		console.log(`Current round: ${this.currentRound ? this.currentRound.id : 'none'}`);
 		console.log(`Incoming round: ${message.roundId}`);
 		
 		if (!this.currentRound || this.currentRound.startTime < message.startTime) {
-			console.log(`✅ Accepting new round from ${message.from}`);
+			console.log(`Accepting new round from ${message.from}`);
 			
 			const votingTimeSeconds = message.votingTimeSeconds || 100;
 			const votingPhaseMs = votingTimeSeconds * 1000;
@@ -1439,8 +1439,8 @@ class VotingNodeWithAutoGUI {
 			if (message.allowedChoices) {
 				console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
 			}
-			console.log(`🔒 Private voting enabled - votes are encrypted until consensus phase`);
-			console.log(`⏰ Voting duration: ${votingTimeSeconds} seconds`);
+			console.log(`Private voting enabled - votes are encrypted until consensus phase`);
+			console.log(`Voting duration: ${votingTimeSeconds} seconds`);
 			console.log(`Started by: ${message.from}`);
 			console.log(`Type 'vote <choice>' to cast your encrypted vote`);
 			
@@ -1449,12 +1449,12 @@ class VotingNodeWithAutoGUI {
 			const consensusDelay = Math.max(100, votingPhaseMs - elapsed);
 			const finishDelay = Math.max(100, (votingPhaseMs + consensusPhaseMs) - elapsed);
 			
-			console.log(`⏲️ Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
+			console.log(`Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
 			
 			this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
 			this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
 		} else {
-			console.log(`❌ Ignoring round start (older or same timestamp)`);
+			console.log(`Ignoring round start (older or same timestamp)`);
 		}
 	}
 
@@ -1467,7 +1467,7 @@ class VotingNodeWithAutoGUI {
         const voteKeys = this.voteKeys.get(this.currentRound.id);
         
         if (!encryptedVotes || !voteKeys) {
-            console.log('⏳ Waiting for vote keys...');
+            console.log('Waiting for vote keys...');
             setTimeout(() => this.checkIfReadyToPropose(), 2000);  // Fixed 2 seconds
             return;
         }
@@ -1476,7 +1476,7 @@ class VotingNodeWithAutoGUI {
         const totalKeys = voteKeys.size;
         const activeNodes = this.getActiveNodeCount();
         
-        console.log(`🔍 Ready check: Have ${totalKeys}/${totalEncryptedVotes} decryption keys`);
+        console.log(`Ready check: Have ${totalKeys}/${totalEncryptedVotes} decryption keys`);
         
         // Wait to ensure we've received key batches from all active nodes
         const uniqueKeyProviders = new Set();
@@ -1491,7 +1491,7 @@ class VotingNodeWithAutoGUI {
             uniqueKeyProviders.add(this.nodeId);
         }
         
-        console.log(`📋 Key providers: ${uniqueKeyProviders.size}/${activeNodes} nodes have shared keys`);
+        console.log(`Key providers: ${uniqueKeyProviders.size}/${activeNodes} nodes have shared keys`);
         
         // STRICT REQUIREMENT: We must have ALL keys from ALL nodes before proposing
         const hasAllKeys = totalKeys >= totalEncryptedVotes;
@@ -1501,15 +1501,15 @@ class VotingNodeWithAutoGUI {
             // Additional safety: wait a bit more to ensure all nodes are in the same state
             if (!this.keysSharingComplete) {
                 this.keysSharingComplete = true;
-                console.log(`✅ All keys received - waiting 2s for synchronization...`);
+                console.log(`All keys received - waiting 2s for synchronization...`);
                 setTimeout(() => this.checkIfReadyToPropose(), 2000);  // Fixed 2 seconds
                 return;
             }
             
-            console.log('✅ All conditions met and synchronized - proposing results');
+            console.log('All conditions met and synchronized - proposing results');
             this.proposeResults();
         } else {
-            console.log(`⏳ Still waiting: need keys for ${totalEncryptedVotes - totalKeys} votes OR key batches from ${activeNodes - uniqueKeyProviders.size} more nodes`);
+            console.log(`Still waiting: need keys for ${totalEncryptedVotes - totalKeys} votes OR key batches from ${activeNodes - uniqueKeyProviders.size} more nodes`);
             // Check again in 2 seconds (fixed retry time for consensus phase)
             setTimeout(() => this.checkIfReadyToPropose(), 2000);
         }
@@ -1535,7 +1535,7 @@ class VotingNodeWithAutoGUI {
         };
         
         this.broadcast(proposal);
-        console.log('📊 Proposed results:', this.formatResults(results));
+        console.log('Proposed results:', this.formatResults(results));
         
         // Add ourselves to consensus
         this.currentRound.consensusNodes.add(this.nodeId);
@@ -1573,7 +1573,7 @@ class VotingNodeWithAutoGUI {
         const resultsMatch = this.compareResults(myResults, message.results);
         
         if (resultsMatch) {
-            console.log(`✅ Results consensus with ${message.from}`);
+            console.log(`Results consensus with ${message.from}`);
             this.currentRound.consensusNodes.add(message.from);
             
             if (!this.currentRound.consensusNodes.has(this.nodeId)) {
@@ -1596,12 +1596,12 @@ class VotingNodeWithAutoGUI {
         const activeNodeCount = this.getActiveNodeCount();
         const consensusCount = this.currentRound.consensusNodes.size;
         
-        console.log(`🔍 Consensus check: ${consensusCount}/${activeNodeCount} nodes agree`);
-        console.log(`📋 Nodes in consensus: ${Array.from(this.currentRound.consensusNodes).join(', ')}`);
+        console.log(`Consensus check: ${consensusCount}/${activeNodeCount} nodes agree`);
+        console.log(`Nodes in consensus: ${Array.from(this.currentRound.consensusNodes).join(', ')}`);
         
         if (consensusCount >= activeNodeCount) {
             this.currentRound.consensusAchieved = true;
-            console.log(`🎯 Full consensus achieved! Finishing round...`);
+            console.log(`Full consensus achieved! Finishing round...`);
             
             if (this.currentRound.finishTimeout) {
                 clearTimeout(this.currentRound.finishTimeout);
@@ -1630,7 +1630,7 @@ class VotingNodeWithAutoGUI {
 		console.log(`Topic: ${this.currentRound.topic}`);
 		console.log(`Final Results:`);
 		console.log(this.formatResults(this.currentRound.results));
-		console.log(`🔓 Anonymous votes (identities protected):`);
+		console.log(`Anonymous votes (identities protected):`);
 		
 		// Show individual votes without revealing who cast them and shuffle the display order
 		const roundVotes = this.votes.get(this.currentRound.id);
@@ -1647,14 +1647,14 @@ class VotingNodeWithAutoGUI {
 		
 		console.log(`Total votes: ${roundVotes.size}`);
 		console.log(`Active nodes: ${this.getActiveNodeCount()}`);
-		console.log(`🔒 Voter identities remain anonymous`);
+		console.log(`Voter identities remain anonymous`);
 		
 		// Verify our own vote was counted (if we voted)
 		this.verifyMyVote();
 		
 		// Show final vote participation summary
 		const participatedNodes = this.countParticipatingNodes();
-		console.log(`📊 Participation: ${participatedNodes}/${this.getActiveNodeCount()} nodes voted`);
+		console.log(`Participation: ${participatedNodes}/${this.getActiveNodeCount()} nodes voted`);
 		
 		console.log('=======================\n');
 		
@@ -1691,12 +1691,12 @@ class VotingNodeWithAutoGUI {
             // Verify the choice matches what we intended to vote
             if (recordedVote.choice.toLowerCase() === myVoteInfo.choice.toLowerCase()) {
                 myVoteInfo.verified = true;
-                console.log(`✅ Vote verification: Your vote for "${myVoteInfo.choice}" was successfully counted`);
+                console.log(`Vote verification: Your vote for "${myVoteInfo.choice}" was successfully counted`);
             } else {
-                console.log(`❌ Vote verification FAILED: Expected "${myVoteInfo.choice}" but found "${recordedVote.choice}"`);
+                console.log(`Vote verification FAILED: Expected "${myVoteInfo.choice}" but found "${recordedVote.choice}"`);
             }
         } else {
-            console.log(`❌ Vote verification FAILED: Your vote was not found in the final results`);
+            console.log(`Vote verification FAILED: Your vote was not found in the final results`);
         }
     }
 
@@ -1749,10 +1749,10 @@ class VotingNodeWithAutoGUI {
 			if (this.activePeers.has(peerId)) {
 				if (nodeIds.has(peerId)) {
 					nodeIds.get(peerId).count++;
-					console.log(`  🚨 ${peerId} (DUPLICATE - ${nodeIds.get(peerId).count} connections)`);
+					console.log(`  ${peerId} (DUPLICATE - ${nodeIds.get(peerId).count} connections)`);
 				} else {
 					nodeIds.set(peerId, { count: 1, connection: ws });
-					console.log(`  ✅ ${peerId}`);
+					console.log(`  ${peerId}`);
 				}
 			}
 		}
@@ -1760,13 +1760,13 @@ class VotingNodeWithAutoGUI {
 		const duplicates = Array.from(nodeIds.entries()).filter(([id, data]) => data.count > 1);
 		
 		if (duplicates.length > 0) {
-			console.log('\n⚠️ DUPLICATES DETECTED:');
+			console.log('\n DUPLICATES DETECTED:');
 			duplicates.forEach(([id, data]) => {
 				console.log(`   - Node ID '${id}' has ${data.count} connections`);
 			});
 			console.log('\nThis can cause voting inconsistencies and network issues.');
 		} else {
-			console.log('\n✅ No duplicate node IDs detected');
+			console.log('\nNo duplicate node IDs detected');
 		}
 		
 		console.log('============================\n');
@@ -1892,9 +1892,9 @@ class VotingNodeWithAutoGUI {
                     
                     // Show voting status
                     if (this.currentRound && this.hasVotedInRound.get(this.currentRound.id)) {
-                        console.log('🗳️ You have already voted in this round.');
+                        console.log('You have already voted in this round.');
                     } else if (this.currentRound && this.currentRound.phase === 'VOTING') {
-                        console.log('📝 You have not voted yet in this round.');
+                        console.log('You have not voted yet in this round.');
                     }
                 } else {
                     this.castVote(choice);
@@ -1914,7 +1914,7 @@ class VotingNodeWithAutoGUI {
                 break;
                 
             case 'gui':
-                console.log('💡 GUI launching has been disabled. Use manager.js to launch and manage GUI interfaces.');
+                console.log('GUI launching has been disabled. Use manager.js to launch and manage GUI interfaces.');
                 break;
 			case 'whoami':
 			case 'info':
@@ -1964,7 +1964,7 @@ class VotingNodeWithAutoGUI {
 	
 	// NEW: Request peer discovery from all connected peers
 	requestPeerDiscovery() {
-		console.log('🔍 Requesting peer discovery from all connected nodes...');
+		console.log('Requesting peer discovery from all connected nodes...');
 		
 		let requestsSent = 0;
 		for (const [peerId, ws] of this.peers) {
@@ -1982,16 +1982,16 @@ class VotingNodeWithAutoGUI {
 		}
 		
 		if (requestsSent > 0) {
-			console.log(`📤 Sent peer discovery requests to ${requestsSent} nodes`);
+			console.log(`Sent peer discovery requests to ${requestsSent} nodes`);
 		} else {
-			console.log('❌ No active peers to request discovery from');
+			console.log('No active peers to request discovery from');
 		}
 	}
 	
 	showNetworkStatus() {
 		console.log('\n=== ENHANCED NETWORK STATUS ===');
 		console.log(`This node: ${this.nodeId} (${this.startupValidationComplete ? 'validated' : 'validating...'})`);
-		console.log(`Duplicate detection: ${this.duplicateNodeDetected ? '❌ DETECTED' : '✅ Clear'}`);
+		console.log(`Duplicate detection: ${this.duplicateNodeDetected ? 'DETECTED' : 'Clear'}`);
 		console.log(`Port: ${this.port}`);
 		console.log(`Active connections: ${this.peers.size}`);
 		console.log(`Node registry entries: ${this.nodeRegistry.size}`);
@@ -2071,13 +2071,13 @@ Available commands:
   gui               - Open the GUI for this node
   quit/exit         - Shutdown the node
 
-🔒 Privacy Features:
+ Privacy Features:
   - Votes are encrypted during voting phase
   - Vote counts are hidden until consensus phase
   - Voter identities are completely anonymous - even after round completion
   - Only vote choices and anonymous IDs are revealed, never who voted for what
 
-🌐 Network Features:
+ Network Features:
   - Automatic peer discovery when connecting to nodes
   - Dynamic network expansion as nodes share their peer lists
   - Manual peer discovery with 'discover' command
@@ -2094,17 +2094,17 @@ Available commands:
             console.log(`Time remaining: ${status.timeRemaining}s`);
             
             if (status.phase === 'VOTING') {
-                console.log(`🔒 Encrypted votes received: ${status.encryptedVoteCount}`);
-                console.log(`❓ Vote contents hidden until consensus phase`);
+                console.log(`Encrypted votes received: ${status.encryptedVoteCount}`);
+                console.log(`Vote contents hidden until consensus phase`);
                 
                 // Show personal voting status
                 if (this.hasVotedInRound.get(this.currentRound.id)) {
-                    console.log(`🗳️ Your voting status: ✅ You have voted in this round`);
+                    console.log(`Your voting status: ✅ You have voted in this round`);
                 } else {
-                    console.log(`📝 Your voting status: ⏳ You have not voted yet`);
+                    console.log(`Your voting status: ⏳ You have not voted yet`);
                 }
             } else if (status.phase === 'CONSENSUS') {
-                console.log(`🔓 Decrypted votes: ${status.decryptedVoteCount}/${status.encryptedVoteCount}`);
+                console.log(`Decrypted votes: ${status.decryptedVoteCount}/${status.encryptedVoteCount}`);
             }
             
             console.log(`Active nodes: ${status.activeNodes}`);
@@ -2138,7 +2138,7 @@ Available commands:
             console.log(`Round: ${topic}`);
             console.log(`  Your vote: ${voteInfo.choice}`);
             console.log(`  Vote ID: ${voteInfo.anonymousVoteId.substring(0, 12)}...`);
-            console.log(`  Status: ${voteInfo.verified ? '✅ Verified - Your vote was counted' : '⏳ Pending verification'}`);
+            console.log(`  Status: ${voteInfo.verified ? 'Verified - Your vote was counted' : 'Pending verification'}`);
             console.log(`  Cast at: ${new Date(voteInfo.timestamp).toLocaleString()}`);
             console.log('');
         }
@@ -2182,14 +2182,14 @@ Available commands:
             const voteKeys = this.voteKeys.get(this.currentRound.id);
             
             if (encryptedVotes) {
-                console.log(`  🔒 Encrypted votes: ${encryptedVotes.size}`);
+                console.log(`  Encrypted votes: ${encryptedVotes.size}`);
                 for (const [anonymousVoteId] of encryptedVotes) {
                     console.log(`    ${anonymousVoteId.substring(0, 8)}...: [encrypted]`);
                 }
             }
             
             if (voteKeys && voteKeys.size > 0) {
-                console.log(`  🔑 Vote keys received: ${voteKeys.size}`);
+                console.log(`  Vote keys received: ${voteKeys.size}`);
                 const keyProviders = new Set();
                 for (const [anonymousVoteId, keyData] of voteKeys) {
                     keyProviders.add(keyData.keyProvider || 'unknown');
@@ -2198,7 +2198,7 @@ Available commands:
             }
             
             if (decryptedVotes && decryptedVotes.size > 0) {
-                console.log(`  🔓 Decrypted anonymous votes: ${decryptedVotes.size}`);
+                console.log(`  Decrypted anonymous votes: ${decryptedVotes.size}`);
                 if (this.currentRound.phase === 'FINISHED') {
                     // Show votes without revealing voter identity or vote IDs
                     const voteEntries = Array.from(decryptedVotes.entries());
@@ -2223,11 +2223,11 @@ Available commands:
     shutdown() {
 		if (this.discoveryInterval) {
             clearInterval(this.discoveryInterval);
-            console.log('⏹️ Stopped LAN discovery broadcast.');
+            console.log('Stopped LAN discovery broadcast.');
         }
         if (this.discoverySocket) {
             this.discoverySocket.close();
-            console.log('🔌 Closed discovery socket.');
+            console.log('Closed discovery socket.');
         }
 		
         if (this.heartbeatInterval) {
@@ -2278,8 +2278,8 @@ function main() {
         console.log('  node voting-node.js alice 3001                    # Start with GUI support');
         console.log('  node voting-node.js alice 3001 --no-gui           # Start without GUI');
         console.log('  node voting-node.js alice 3001 localhost:3002     # Start with peer and GUI');
-        console.log('\n🔒 This version implements private voting with encryption');
-        console.log('💡 Use manager.js to launch and manage GUI interfaces');
+        console.log('\n This version implements private voting with encryption');
+        console.log('Use manager.js to launch and manage GUI interfaces');
         process.exit(1);
     }
     
@@ -2300,8 +2300,8 @@ function main() {
     
     node.start().then(() => {
         console.log(`Node ${nodeId} started successfully!`);
-        console.log('🔒 Private voting system ready');
-        console.log('💡 Use manager.js to launch and manage GUI interfaces');
+        console.log('Private voting system ready');
+        console.log('Use manager.js to launch and manage GUI interfaces');
         
         node.prompt();
     }).catch(error => {

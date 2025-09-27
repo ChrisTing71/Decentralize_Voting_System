@@ -10,7 +10,7 @@ let Docker;
 try {
     Docker = require('dockerode');
 } catch (error) {
-    console.error('⚠️ dockerode module not found. Please run: npm install dockerode');
+    console.error('dockerode module not found. Please run: npm install dockerode');
     console.error('Continuing without Docker support...');
 }
 
@@ -35,17 +35,17 @@ if (Docker) {
         // Test Docker connection
         docker.ping((err, data) => {
             if (err) {
-                console.error('⚠️ Cannot connect to Docker:', err.message);
+                console.error('Cannot connect to Docker:', err.message);
                 console.log('Make sure Docker Desktop is running');
                 dockerAvailable = false;
             } else {
-                console.log('✅ Connected to Docker successfully');
+                console.log('Connected to Docker successfully');
                 dockerAvailable = true;
                 ensureNetwork();
             }
         });
     } catch (error) {
-        console.error('⚠️ Failed to initialize Docker:', error.message);
+        console.error('Failed to initialize Docker:', error.message);
     }
 }
 
@@ -148,7 +148,7 @@ app.post('/api/launch-node', async (req, res) => {
         );
         
         if (!imageExists) {
-            console.log('⚠️ Docker image not found, building it now...');
+            console.log('Docker image not found, building it now...');
             await buildDockerImage();
         }
 
@@ -236,7 +236,7 @@ app.post('/api/launch-node', async (req, res) => {
             peers: peerConnections
         };
 
-        console.log(`✅ Container ${containerName} started`);
+        console.log(`Container ${containerName} started`);
         console.log(`   - Container IP: ${containerIp}`);
         console.log(`   - Host Port: ${port}`);
         console.log(`   - Peers: ${peerConnections.join(', ') || 'none'}`);
@@ -300,12 +300,12 @@ app.post('/api/stop-node', async (req, res) => {
 
 // Build Docker image
 async function buildDockerImage() {
-    console.log('🐳 Building Docker image for voting nodes...');
+    console.log('Building Docker image for voting nodes...');
     
     // Check if Dockerfile exists
     const dockerfilePath = path.join(__dirname, 'Dockerfile.node');
     if (!fs.existsSync(dockerfilePath)) {
-        console.error('❌ Dockerfile.node not found!');
+        console.error('Dockerfile.node not found!');
         throw new Error('Dockerfile.node not found');
     }
     
@@ -319,7 +319,7 @@ async function buildDockerImage() {
                     if (stderr) console.error('Build errors:', stderr);
                     reject(error);
                 } else {
-                    console.log('✅ Docker image built successfully');
+                    console.log('Docker image built successfully');
                     if (stdout) console.log('Build output:', stdout);
                     resolve();
                 }
@@ -363,9 +363,9 @@ async function ensureNetwork() {
                     'com.docker.network.bridge.enable_ip_masquerade': 'true'
                 }
             });
-            console.log('✅ Network created with subnet 172.20.0.0/16');
+            console.log('Network created with subnet 172.20.0.0/16');
         } else {
-            console.log('✅ Network already exists');
+            console.log('Network already exists');
             // Log network details for debugging
             const networkDetails = await docker.getNetwork('voting-network').inspect();
             if (networkDetails.IPAM && networkDetails.IPAM.Config && networkDetails.IPAM.Config[0]) {
@@ -408,7 +408,7 @@ async function cleanup() {
 
 // Handle shutdown
 process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down manager...');
+    console.log('\n Shutting down manager...');
     await cleanup();
     process.exit(0);
 });
@@ -426,20 +426,20 @@ app.get('/api/health', (req, res) => {
 // Start manager server
 app.listen(PORT, async () => {
     console.log(`=============================================`);
-    console.log(`  🐳 Docker-based P2P Voting Manager`);
+    console.log(` Docker-based P2P Voting Manager`);
     console.log(`  Control Panel: http://localhost:${PORT}/register-docker.html`);
     console.log(`=============================================`);
     
     if (!Docker) {
-        console.log('\n⚠️  WARNING: dockerode module not installed!');
+        console.log('\n WARNING: dockerode module not installed!');
         console.log('   Run: npm install dockerode');
         console.log('   Container management will not work without it.\n');
     } else if (!dockerAvailable) {
-        console.log('\n⚠️  WARNING: Cannot connect to Docker!');
+        console.log('\n WARNING: Cannot connect to Docker!');
         console.log('   Make sure Docker Desktop is running.');
         console.log('   On Windows, Docker Desktop must be running.\n');
     } else {
-        console.log(`\n✅ Docker connected successfully!`);
+        console.log(`\n Docker connected successfully!`);
         console.log(`   Platform: ${process.platform}`);
         console.log(`   Ready to launch voting nodes in containers!\n`);
     }
