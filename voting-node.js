@@ -1650,7 +1650,7 @@ class VotingNodeWithAutoGUI {
 		console.log(`Voter identities remain anonymous`);
 		
 		// Verify our own vote was counted (if we voted)
-		this.verifyMyVote();
+		const voteVerified = this.verifyMyVote();
 		
 		// Show final vote participation summary
 		const participatedNodes = this.countParticipatingNodes();
@@ -1660,14 +1660,15 @@ class VotingNodeWithAutoGUI {
 		
 		this.results.set(this.currentRound.id, this.currentRound.results);
 		
-		// ENHANCED: Send comprehensive results to GUI clients
+		// ENHANCED: Send comprehensive results to GUI clients including vote verification
 		this.notifyGUIClients('RESULTS', {
 			results: this.currentRound.results,
 			roundId: this.currentRound.id,
 			topic: this.currentRound.topic,
 			totalVotes: roundVotes.size,
 			activeNodes: this.getActiveNodeCount(),
-			participation: `${participatedNodes}/${this.getActiveNodeCount()}`
+			participation: `${participatedNodes}/${this.getActiveNodeCount()}`,
+			voteVerified: voteVerified // Include verification status
 		});
 		
 		this.notifyGUIClients('PHASE_CHANGE', {
@@ -1678,7 +1679,7 @@ class VotingNodeWithAutoGUI {
 
     verifyMyVote() {
         if (!this.myVoteTracking || !this.myVoteTracking.has(this.currentRound.id)) {
-            return; // We didn't vote in this round
+            return null; // We didn't vote in this round
         }
         
         const myVoteInfo = this.myVoteTracking.get(this.currentRound.id);
@@ -1692,11 +1693,14 @@ class VotingNodeWithAutoGUI {
             if (recordedVote.choice.toLowerCase() === myVoteInfo.choice.toLowerCase()) {
                 myVoteInfo.verified = true;
                 console.log(`Vote verification: Your vote for "${myVoteInfo.choice}" was successfully counted`);
+                return { verified: true, choice: myVoteInfo.choice };
             } else {
                 console.log(`Vote verification FAILED: Expected "${myVoteInfo.choice}" but found "${recordedVote.choice}"`);
+                return { verified: false, choice: myVoteInfo.choice, reason: 'mismatch' };
             }
         } else {
             console.log(`Vote verification FAILED: Your vote was not found in the final results`);
+            return { verified: false, choice: myVoteInfo.choice, reason: 'not_found' };
         }
     }
 
