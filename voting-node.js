@@ -1446,10 +1446,18 @@ class VotingNodeWithAutoGUI {
 			
 			// Calculate when to enter consensus phase based on elapsed time
 			const elapsed = Date.now() - message.startTime;
-			const consensusDelay = Math.max(100, votingPhaseMs - elapsed);
+			const timeRemainingInVoting = votingPhaseMs - elapsed;
+			
+			// Check if we're joining late - if less than 5 seconds remain, warn user
+			if (timeRemainingInVoting < 5000) {
+				console.log(`⚠️  WARNING: Joined round late! Only ${Math.max(0, Math.floor(timeRemainingInVoting/1000))} seconds remaining in voting phase`);
+			}
+			
+			// Ensure minimum time for transitions, but don't skip phases entirely
+			const consensusDelay = Math.max(100, timeRemainingInVoting);
 			const finishDelay = Math.max(100, (votingPhaseMs + consensusPhaseMs) - elapsed);
 			
-			console.log(`Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
+			console.log(`Time elapsed: ${Math.floor(elapsed/1000)}s, Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
 			
 			this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
 			this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
