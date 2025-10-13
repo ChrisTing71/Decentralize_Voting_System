@@ -1409,11 +1409,23 @@ class VotingNodeWithAutoGUI {
 			const votingPhaseMs = votingTimeSeconds * 1000;
 			const consensusPhaseMs = 15000; // Fixed 15 seconds for consensus
 			
+			// CLOCK SYNC FIX: Use our local time when we receive the message, not the sender's timestamp
+			// This prevents issues with clock skew between nodes
+			const localStartTime = Date.now();
+			
+			// Calculate clock skew for debugging (but don't use it for timing)
+			const clockSkew = localStartTime - message.startTime;
+			if (Math.abs(clockSkew) > 5000) {
+				console.log(`⚠️  Clock skew detected: ${Math.floor(clockSkew/1000)}s difference from ${message.from}`);
+				console.log(`   Using local clock for round timing to ensure fair voting period`);
+			}
+			
 			this.currentRound = {
 				id: message.roundId,
 				topic: message.topic,
 				allowedChoices: message.allowedChoices,
-				startTime: message.startTime,
+				startTime: localStartTime, // Use local time, not sender's time
+				originalStartTime: message.startTime, // Keep original for reference
 				duration: votingPhaseMs + consensusPhaseMs,
 				votingTimeSeconds: votingTimeSeconds,
 				votingPhaseMs: votingPhaseMs,
@@ -1440,24 +1452,17 @@ class VotingNodeWithAutoGUI {
 				console.log(`Allowed choices: ${message.allowedChoices.join(', ')}`);
 			}
 			console.log(`Private voting enabled - votes are encrypted until consensus phase`);
-			console.log(`Voting duration: ${votingTimeSeconds} seconds`);
+			console.log(`Voting duration: ${votingTimeSeconds} seconds (full duration from now)`);
+			console.log(`Consensus phase: ${consensusPhaseMs/1000} seconds`);
 			console.log(`Started by: ${message.from}`);
 			console.log(`Type 'vote <choice>' to cast your encrypted vote`);
 			
-			// Calculate when to enter consensus phase based on elapsed time
-			const elapsed = Date.now() - message.startTime;
-			const timeRemainingInVoting = votingPhaseMs - elapsed;
+			// Use full voting duration from local time - no need to calculate "elapsed"
+			// This ensures every node gets the full voting period regardless of clock differences
+			const consensusDelay = votingPhaseMs;
+			const finishDelay = votingPhaseMs + consensusPhaseMs;
 			
-			// Check if we're joining late - if less than 5 seconds remain, warn user
-			if (timeRemainingInVoting < 5000) {
-				console.log(`⚠️  WARNING: Joined round late! Only ${Math.max(0, Math.floor(timeRemainingInVoting/1000))} seconds remaining in voting phase`);
-			}
-			
-			// Ensure minimum time for transitions, but don't skip phases entirely
-			const consensusDelay = Math.max(100, timeRemainingInVoting);
-			const finishDelay = Math.max(100, (votingPhaseMs + consensusPhaseMs) - elapsed);
-			
-			console.log(`Time elapsed: ${Math.floor(elapsed/1000)}s, Will enter consensus in ${Math.floor(consensusDelay/1000)} seconds`);
+			console.log(`Voting phase will last ${votingTimeSeconds} seconds, then ${consensusPhaseMs/1000}s consensus`);
 			
 			this.currentRound.consensusTimeout = setTimeout(() => this.enterConsensusPhase(), consensusDelay);
 			this.currentRound.finishTimeout = setTimeout(() => this.finishRound(), finishDelay);
