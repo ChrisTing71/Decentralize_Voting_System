@@ -181,7 +181,7 @@
             const peerItem = document.createElement('div');
             peerItem.className = 'peer-item';
             peerItem.innerHTML = `<input type="text" class="peer-address" placeholder="例如: localhost:3002"><button type="button" onclick="this.parentElement.remove()" style="border:none; background:transparent; cursor:pointer; font-size:1.2em;">&times;</button>`;
-            container.appendChild(item);
+            container.appendChild(peerItem);
         }
 
         function showStatus(message, type) {
