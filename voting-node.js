@@ -1293,7 +1293,7 @@ class VotingNodeWithAutoGUI {
 				if (ws.readyState === WebSocket.OPEN) {
 					try {
 						ws.send(messageStr);
-						console.log(`📱 Sent ${message.type} to GUI client ${clientId}`);
+						console.log(`Sent ${message.type} to GUI client ${clientId}`);
 					} catch (error) {
 						console.error(`Failed to send to GUI ${clientId}:`, error.message);
 						this.guiClients.delete(clientId);
